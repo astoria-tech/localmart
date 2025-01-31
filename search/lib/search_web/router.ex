@@ -21,6 +21,14 @@ defmodule SearchWeb.Router do
     live "/", SearchLive
   end
 
+  scope "/api", SearchWeb do
+    pipe_through :api
+
+    post "/documents", SearchController, :create
+    get "/search", SearchController, :search
+    get "/hydrate", SearchController, :hydrate
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", SearchWeb do
   #   pipe_through :api
