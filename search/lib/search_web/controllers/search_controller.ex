@@ -1,10 +1,10 @@
 defmodule SearchWeb.SearchController do
   use SearchWeb, :controller
 
-  alias Search.Meilisearch
+  alias Search.Meili
 
-  def search(conn, %{"query" => query} = params) do
-    case Meilisearch.search(query) do
+  def search(conn, %{"query" => query} = _params) do
+    case Meili.search(query) do
       {:ok, results} ->
         conn
         |> put_status(:ok)
@@ -17,8 +17,8 @@ defmodule SearchWeb.SearchController do
     end
   end
 
-  def create(conn, %{"documents" => documents}) do
-    case Meilisearch.add_documents_to_search_index(documents) do
+  def create(conn, %{"documents" => documents, "index" => index}) do
+    case Meili.add_documents_to_search_index(index, documents) do
       {:ok, task} ->
         conn
         |> put_status(:accepted)
@@ -32,7 +32,7 @@ defmodule SearchWeb.SearchController do
   end
 
   def hydrate(conn, _params) do
-    case Meilisearch.hydrate() do
+    case Meili.hydrate() do
       {:ok, task} ->
         conn
         |> put_status(:accepted)

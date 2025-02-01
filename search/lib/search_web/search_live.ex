@@ -5,7 +5,7 @@ defmodule SearchWeb.SearchLive do
   def mount(_params, _session, socket) do
     {:ok, socket}
 
-    {:ok, results} = Search.Meilisearch.search("")
+    {:ok, results} = Search.Meili.search("")
 
     {:ok,
      socket
@@ -16,7 +16,7 @@ defmodule SearchWeb.SearchLive do
 
   @impl true
   def handle_event("search", %{"search" => search}, socket) do
-    {:ok, results} = Search.Meilisearch.search(search)
+    {:ok, results} = Search.Meili.search(search)
 
     {:noreply,
      socket
@@ -26,7 +26,7 @@ defmodule SearchWeb.SearchLive do
 
   def handle_event("load", _params, socket) do
     {:ok, results} =
-      Search.Meilisearch.load_more(socket.assigns.form["search"], length(socket.assigns.results))
+      Search.Meili.load_more(socket.assigns.form["search"], length(socket.assigns.results))
 
     {:noreply,
      socket

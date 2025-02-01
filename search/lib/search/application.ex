@@ -14,12 +14,12 @@ defmodule Search.Application do
       # Start the Finch HTTP client for sending emails
       {Finch, name: Search.Finch},
       {Meilisearch,
-       name: :movies,
+       name: :public_search,
        endpoint: Application.get_env(:search, :meilisearch)[:host],
-       key: "id",
+       key: "public_key",
        finch: Search.Finch},
-      # Start a worker by calling: Search.Worker.start_link(arg)
-      # {Search.Worker, arg},
+      # Start our custom task
+      Search.Task,
       # Start to serve requests, typically the last entry
       SearchWeb.Endpoint
     ]
