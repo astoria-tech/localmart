@@ -3,35 +3,33 @@ defmodule SearchWeb.SearchLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket}
-
-    {:ok, results} = Search.Meili.search("")
+    {:ok, results} = Search.Meili.search_document("movies", "", 0)
 
     {:ok,
      socket
      |> assign(:form, %{})
-     |> assign(:results, results["hits"])
-     |> assign(:processing_time, results["processing_time"])}
+     |> assign(:results, results.hits)
+     |> assign(:processing_time, results.processingTimeMs)}
   end
 
   @impl true
-  def handle_event("search", %{"search" => search}, socket) do
-    {:ok, results} = Search.Meili.search(search)
+  def handle_event("search", %{"search" => query}, socket) do
+    {:ok, results} = Search.Meili.search_document("movies", query, 0)
 
     {:noreply,
      socket
-     |> assign(:results, results["hits"])
-     |> assign(:processing_time, results["processing_time"])}
+     |> assign(:results, results.hits)
+     |> assign(:processing_time, results.processingTimeMs)}
   end
 
   def handle_event("load", _params, socket) do
-    {:ok, results} =
-      Search.Meili.load_more(socket.assigns.form["search"], length(socket.assigns.results))
+    offset = length(socket.assigns.results)
+    {:ok, results} = Search.Meili.search_document("movies", socket.assigns.form["search"], offset)
 
     {:noreply,
      socket
-     |> assign(:results, socket.assigns.results ++ results["hits"])
-     |> assign(:processing_time, results["processing_time"])}
+     |> assign(:results, socket.assigns.results ++ results.hits)
+     |> assign(:processing_time, results.processingTimeMs)}
   end
 
   @impl true
@@ -40,7 +38,7 @@ defmodule SearchWeb.SearchLive do
     <.header>
       <div class="flex space-x-4 self-center items-center">
         <h1>
-          Movies
+          Movies Search
         </h1>
 
         <h1 class="text-sm text-green-500">

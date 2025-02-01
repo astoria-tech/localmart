@@ -3,8 +3,9 @@ defmodule SearchWeb.SearchController do
 
   alias Search.Meili
 
-  def search(conn, %{"query" => query} = _params) do
-    case Meili.search(query) do
+
+  def search(conn, %{"query" => query, "index" => index} = _params) do
+    case Meili.search_document(index, query, 0) do
       {:ok, results} ->
         conn
         |> put_status(:ok)
@@ -43,5 +44,14 @@ defmodule SearchWeb.SearchController do
         |> put_status(:unprocessable_entity)
         |> json(%{error: reason})
     end
+  end
+end
+
+defimpl Jason.Encoder, for: Meilisearch.Search do
+  def encode(value, opts) do
+    value
+    |> Map.from_struct()
+    |> Map.take([:hits, :processingTimeMs])
+    |> Jason.Encode.map(opts)
   end
 end

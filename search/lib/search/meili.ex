@@ -3,36 +3,6 @@ defmodule Search.Meili do
   This module provides functions to interact with MeiliSearch.
   """
 
-  def search(query) do
-    meili_host = config(:host)
-
-    case Req.get!("#{meili_host}/indexes/movies/search", params: %{q: query}) do
-      %{status: 200, body: body} ->
-        {:ok, body}
-
-      %{status: status, body: body} ->
-        {:ok, {status, body}}
-
-      {:error, error} ->
-        error
-    end
-  end
-
-  def load_more(query, offset) do
-    meili_host = config(:host)
-
-    case Req.get!("#{meili_host}/indexes/movies/search", params: %{q: query, offset: offset}) do
-      %{status: 200, body: body} ->
-        {:ok, body}
-
-      %{status: status, body: body} ->
-        {:ok, {status, body}}
-
-      {:error, error} ->
-        error
-    end
-  end
-
   def create_search_index(index) do
     :public_search
     |> Meilisearch.client()
@@ -45,10 +15,10 @@ defmodule Search.Meili do
     |> Meilisearch.Document.create_or_replace(index, documents)
   end
 
-  def search_document(index, query) do
+  def search_document(index, query, offset \\ 0) do
     :public_search
     |> Meilisearch.client()
-    |> Meilisearch.Search.search(index, %{q: query})
+    |> Meilisearch.Search.search(index, %{q: query, offset: offset})
   end
 
   def hydrate do
