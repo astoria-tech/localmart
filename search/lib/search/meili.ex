@@ -28,13 +28,9 @@ defmodule Search.Meili do
          {:ok, movies} <- Jason.decode(content),
          {:ok, _} <- create_search_index("movies"),
          {:ok, task} <- add_documents_to_search_index("movies", movies) do
-      {:ok, task |> Map.from_struct()}
+      {:ok, task}
     else
       {:error, reason} -> {:error, reason}
     end
-  end
-
-  defp config(key) do
-    Application.get_env(:search, :meilisearch)[key]
   end
 end

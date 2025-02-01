@@ -3,7 +3,6 @@ defmodule SearchWeb.SearchController do
 
   alias Search.Meili
 
-
   def search(conn, %{"query" => query, "index" => index} = _params) do
     case Meili.search_document(index, query, 0) do
       {:ok, results} ->
@@ -29,20 +28,6 @@ defmodule SearchWeb.SearchController do
         conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: error})
-    end
-  end
-
-  def hydrate(conn, _params) do
-    case Meili.hydrate() do
-      {:ok, task} ->
-        conn
-        |> put_status(:accepted)
-        |> json(%{message: "Documents are being processed", task: task})
-
-      {:error, reason} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: reason})
     end
   end
 end
