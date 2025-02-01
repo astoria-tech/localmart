@@ -2,7 +2,7 @@ defmodule Search.Task do
   use GenServer
   require Logger
 
-  @movies_url "https://raw.githubusercontent.com/Allyedge/movies/main/data/movies.json"
+  @movies_db "https://raw.githubusercontent.com/Allyedge/movies/main/data/movies.json"
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -51,7 +51,7 @@ defmodule Search.Task do
 
     Logger.info("Downloading movies data to #{target_path}")
 
-    case Req.get!(@movies_url) do
+    case Req.get!(@movies_db) do
       %{status: 200, body: body} ->
         File.write!(target_path, body)
         Logger.info("Successfully downloaded movies data")

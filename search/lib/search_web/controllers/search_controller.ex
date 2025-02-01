@@ -30,6 +30,20 @@ defmodule SearchWeb.SearchController do
         |> json(%{error: error})
     end
   end
+
+  def hydrate(conn, _params) do
+    case Meili.hydrate() do
+      {:ok, task} ->
+        conn
+        |> put_status(:accepted)
+        |> json(%{message: "Documents are being processed", task: task})
+
+      {:error, error} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: error})
+    end
+  end
 end
 
 defimpl Jason.Encoder, for: Meilisearch.Search do
