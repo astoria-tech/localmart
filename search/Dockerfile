@@ -81,9 +81,6 @@ ENV LC_ALL en_US.UTF-8
 WORKDIR "/app"
 RUN chown nobody /app
 
-# Copy movies test data
-COPY --chown=nobody:root data/movies.json /app/data/movies.json
-
 # set runner ENV
 ENV MIX_ENV="prod"
 
