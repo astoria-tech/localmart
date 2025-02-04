@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import OrderHistoryModal from './OrderHistoryModal'
 import CartModal from './CartModal'
-import { ShoppingCartIcon } from '@heroicons/react/24/outline'
+import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
 
 export default function Header() {
   const { user, logout } = useAuth()
@@ -46,16 +46,17 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-50">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-2xl font-bold font-display text-white">
-            localmart
+        <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 group">
+            <BuildingStorefrontIcon className="h-7 w-7 text-white/90 group-hover:text-white transition-colors" />
+            <span className="text-2xl font-bold font-display text-white">localmart</span>
           </Link>
           {user && (
             <a
               href="http://localhost:8090/_/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-white/80 hover:text-white transition-colors"
+              className="text-sm text-white/80 hover:text-white transition-colors ml-2"
             >
               admin
             </a>

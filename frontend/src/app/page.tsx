@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './contexts/auth';
 import Link from 'next/link';
+import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 
 interface Store {
   id: string;
@@ -75,7 +76,10 @@ export default function Page() {
       <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-[#2D3748] mb-4">localmart</h1>
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <BuildingStorefrontIcon className="h-12 w-12 text-[#2A9D8F]" />
+              <h1 className="text-4xl font-bold text-[#2D3748] font-display">localmart</h1>
+            </div>
             <p className="text-lg text-[#4A5568]">
               Shop from your favorite local stores with same-day delivery
             </p>
