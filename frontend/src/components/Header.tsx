@@ -46,9 +46,21 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 bg-blue-600 text-white p-4 shadow-md z-50">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
-        <Link href="/" className="text-2xl font-bold">
-          localmart
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-2xl font-bold">
+            localmart
+          </Link>
+          {user && (
+            <a
+              href="http://localhost:8090/_/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-100 hover:text-white transition-colors"
+            >
+              admin
+            </a>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           {user ? (
             <>
@@ -59,14 +71,6 @@ export default function Header() {
               >
                 Order History
               </button>
-              <a
-                href="http://localhost:8090/_/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                Admin Dashboard
-              </a>
               <button
                 onClick={logout}
                 className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
