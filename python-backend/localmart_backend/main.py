@@ -1,12 +1,19 @@
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request
 from pocketbase import PocketBase
-from typing import List, Dict
+from typing import List, Dict, Set
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import httpx
 import datetime
 import json
+import asyncio
+import logging
+from .uber_direct import UberDirectClient
+
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize PocketBase client
 pb = PocketBase('http://pocketbase:8090')
@@ -15,6 +22,44 @@ pb = PocketBase('http://pocketbase:8090')
 UBER_CUSTOMER_ID = os.getenv('LOCALMART_UBER_DIRECT_CUSTOMER_ID')
 UBER_CLIENT_ID = os.getenv('LOCALMART_UBER_DIRECT_CLIENT_ID')
 UBER_CLIENT_SECRET = os.getenv('LOCALMART_UBER_DIRECT_CLIENT_SECRET')
+
+# Initialize Uber Direct client
+uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SECRET)
+
+# Track active deliveries
+active_deliveries: Set[str] = set()
+
+async def poll_delivery_status(delivery_id: str, order_id: str):
+    """Poll Uber Direct API for delivery status updates"""
+    try:
+        while delivery_id in active_deliveries:
+            delivery_data = await uber_client.get_delivery_status(delivery_id)
+            status = delivery_data['status']
+            
+            # Update order status in PocketBase
+            pb.collection('orders').update(order_id, {
+                'status': status
+            })
+
+            # Create status update record
+            pb.collection('order_status_updates').create({
+                'order': order_id,
+                'status': status,
+                'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                'details': delivery_data
+            })
+
+            # Remove from active deliveries if in terminal state
+            if status in ['delivered', 'cancelled']:
+                active_deliveries.remove(delivery_id)
+                logger.info(f"Delivery {delivery_id} completed with status: {status}")
+                break
+
+            # Poll every 30 seconds
+            await asyncio.sleep(30)
+    except Exception as e:
+        logger.error(f"Error polling delivery {delivery_id}: {str(e)}")
+        active_deliveries.remove(delivery_id)
 
 class UserLogin(BaseModel):
     email: str
@@ -40,10 +85,11 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000"],  # Frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 @app.on_event("startup")
@@ -103,90 +149,217 @@ async def list_store_items(store_id: str):
 async def get_delivery_quote(request: DeliveryQuoteRequest):
     """Get a delivery quote from Uber Direct"""
     try:
-        # First, get the store details and item details
+        # Get store details
         store = pb.collection('stores').get_one(request.store_id)
+        
+        # Get item details
         item = pb.collection('store_items').get_one(request.item_id)
-
-        # Convert price to cents for Uber Direct
-        item_price_cents = int(item.price * 100)
-
-        # Get Uber Direct OAuth token
-        async with httpx.AsyncClient() as client:
-            token_response = await client.post(
-                'https://auth.uber.com/oauth/v2/token',
-                data={
-                    'client_id': UBER_CLIENT_ID,
-                    'client_secret': UBER_CLIENT_SECRET,
-                    'grant_type': 'client_credentials',
-                    'scope': 'eats.deliveries'
-                }
-            )
-            token_data = token_response.json()
-            access_token = token_data['access_token']
-
-            # Format addresses as required by Uber Direct
-            pickup_address = {
-                "street_address": [store.street_1],
-                "city": store.city,
-                "state": store.state,
-                "zip_code": "11102",
-                "country": "US"
-            }
-
-            dropoff_address = {
-                "street_address": [request.delivery_address['street']],
-                "city": request.delivery_address['city'],
-                "state": request.delivery_address['state'],
-                "zip_code": "11102",  # Hardcode to Astoria zip
-                "country": "US"
-            }
-
-            # Get current time for delivery windows
-            now = datetime.datetime.now(datetime.timezone.utc)
-            pickup_ready = now + datetime.timedelta(minutes=20)
-            pickup_deadline = pickup_ready + datetime.timedelta(minutes=30)
-            dropoff_ready = pickup_deadline
-            dropoff_deadline = dropoff_ready + datetime.timedelta(hours=1)
-
-            # Get delivery quote
-            quote_response = await client.post(
-                f'https://api.uber.com/v1/customers/{UBER_CUSTOMER_ID}/delivery_quotes',
-                headers={
-                    'Authorization': f'Bearer {access_token}',
-                    'Content-Type': 'application/json'
-                },
-                json={
-                    "pickup_address": json.dumps(pickup_address),
-                    "dropoff_address": json.dumps(dropoff_address),
-                    "pickup_ready_dt": pickup_ready.isoformat(),
-                    "pickup_deadline_dt": pickup_deadline.isoformat(),
-                    "dropoff_ready_dt": dropoff_ready.isoformat(),
-                    "dropoff_deadline_dt": dropoff_deadline.isoformat(),
-                    "manifest_total_value": item_price_cents,
-                    "pickup_phone_number": "+15555555555",
-                    "dropoff_phone_number": "+15555555555"
-                }
-            )
-
-            if quote_response.status_code != 200:
-                print(f"Uber API error: {quote_response.text}")
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to get delivery quote from Uber"
-                )
-
-            quote_data = quote_response.json()
-            return {
-                'fee': quote_data['fee'],
-                'currency': quote_data['currency'],
-                'estimated_delivery_time': quote_data['dropoff_eta']
-            }
+        item_price_cents = int(item.price * 100)  # Convert to cents
+        
+        # Prepare addresses
+        pickup_address = {
+            'street_address': [store.street_1],
+            'city': store.city,
+            'state': store.state,
+            'zip_code': '11102',
+            'country': 'US'
+        }
+        
+        # Calculate time windows
+        now = datetime.datetime.now(datetime.timezone.utc)
+        pickup_ready = now + datetime.timedelta(minutes=15)
+        pickup_deadline = pickup_ready + datetime.timedelta(hours=1)
+        dropoff_ready = pickup_ready + datetime.timedelta(minutes=30)
+        dropoff_deadline = dropoff_ready + datetime.timedelta(hours=1)
+        
+        # Get quote from Uber Direct
+        quote_data = await uber_client.get_delivery_quote(
+            pickup_address=pickup_address,
+            dropoff_address=request.delivery_address,
+            pickup_ready=pickup_ready,
+            pickup_deadline=pickup_deadline,
+            dropoff_ready=dropoff_ready,
+            dropoff_deadline=dropoff_deadline,
+            item_price_cents=item_price_cents
+        )
+        
+        return {
+            'fee': quote_data['fee'],
+            'currency': quote_data['currency'],
+            'estimated_delivery_time': quote_data['dropoff_eta']
+        }
 
     except Exception as e:
-        print(f"Delivery quote error: {str(e)}")
+        logger.error(f"Delivery quote error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get delivery quote: {str(e)}"
+        )
+
+@app.post("/api/v0/orders", response_model=Dict)
+async def create_order(
+    background_tasks: BackgroundTasks,
+    request: Dict
+):
+    """Create a new order and initiate Uber delivery"""
+    try:
+        # First create the order in PocketBase
+        order = pb.collection('orders').create({
+            'user': request['user_id'],
+            'store': request['store_id'],
+            'status': 'pending',
+            'delivery_address': request['delivery_address'],
+            'subtotal_amount': request['subtotal_amount'],
+            'tax_amount': request['tax_amount'],
+            'delivery_fee': request['delivery_fee'],
+            'total_amount': request['total_amount'],
+            'estimated_delivery_time': request['estimated_delivery_time'],
+            'pickup_ready_time': request['pickup_ready_time'],
+            'pickup_deadline_time': request['pickup_deadline_time'],
+            'dropoff_ready_time': request['dropoff_ready_time'],
+            'dropoff_deadline_time': request['dropoff_deadline_time']
+        })
+
+        # Create order items
+        for item in request['items']:
+            pb.collection('order_items').create({
+                'order': order.id,
+                'store_item': item['store_item_id'],
+                'quantity': item['quantity'],
+                'price_at_time': item['price'],
+                'total_price': item['price'] * item['quantity']
+            })
+
+        # Get store details
+        store = pb.collection('stores').get_one(request['store_id'])
+        
+        # Prepare pickup address
+        pickup_address = {
+            'street_address': [store.street_1],
+            'city': store.city,
+            'state': store.state,
+            'zip_code': '11102',
+            'country': 'US'
+        }
+        
+        # Prepare manifest items
+        manifest_items = [
+            {
+                'name': item['name'],
+                'quantity': item['quantity'],
+                'price': int(item['price'] * 100)
+            }
+            for item in request['items']
+        ]
+        
+        # Create delivery in Uber Direct
+        delivery_data = await uber_client.create_delivery(
+            pickup_address=pickup_address,
+            dropoff_address=request['delivery_address'],
+            pickup_ready=request['pickup_ready_time'],
+            pickup_deadline=request['pickup_deadline_time'],
+            dropoff_ready=request['dropoff_ready_time'],
+            dropoff_deadline=request['dropoff_deadline_time'],
+            total_amount=request['total_amount'],
+            manifest_items=manifest_items
+        )
+        
+        # Update order with Uber delivery details
+        pb.collection('orders').update(order.id, {
+            'uber_delivery_id': delivery_data['id'],
+            'uber_tracking_url': delivery_data['tracking_url'],
+            'status': 'confirmed'
+        })
+
+        # Start polling for updates
+        active_deliveries.add(delivery_data['id'])
+        background_tasks.add_task(
+            poll_delivery_status,
+            delivery_data['id'],
+            order.id
+        )
+
+        return {
+            'order_id': order.id,
+            'uber_delivery_id': delivery_data['id'],
+            'tracking_url': delivery_data['tracking_url']
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating order: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create order: {str(e)}"
+        )
+
+@app.get("/api/v0/orders", response_model=List[Dict])
+async def get_user_orders(request: Request):
+    """Get orders for the authenticated user"""
+    try:
+        # Get auth token from header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+        
+        token = auth_header.split(' ')[1]
+        logger.info(f"Received token in orders endpoint: {token[:20]}...")  # Log first 20 chars of token
+        
+        try:
+            # Update the auth store with the token
+            pb.auth_store.save(token, None)  # The second parameter is the model which we'll get from the token
+            
+            if not pb.auth_store.isValid:
+                raise Exception("Token is not valid")
+                
+            user_id = pb.auth_store.model.id
+            logger.info(f"Successfully authenticated user: {user_id}")
+        except Exception as e:
+            logger.error(f"Auth error: {str(e)}")
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Get user's orders
+        orders = pb.collection('orders').get_list(
+            1, 50,  # Get up to 50 orders
+            filter=f'user = "{user_id}"',
+            sort='-created',
+            expand='store,order_items'
+        )
+
+        # Format orders for response
+        formatted_orders = []
+        for order in orders.items:
+            formatted_order = {
+                'id': order.id,
+                'created': order.created,
+                'status': order.status,
+                'delivery_fee': order.delivery_fee,
+                'total_amount': order.total_amount,
+                'uber_tracking_url': order.uber_tracking_url,
+                'store': {
+                    'id': order.expand.store.id,
+                    'name': order.expand.store.name
+                } if order.expand.get('store') else None,
+                'items': [
+                    {
+                        'id': item.id,
+                        'name': item.name,
+                        'quantity': item.quantity,
+                        'price': item.price_at_time
+                    }
+                    for item in order.expand.get('order_items', [])
+                ]
+            }
+            formatted_orders.append(formatted_order)
+
+        return formatted_orders
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching orders: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch orders: {str(e)}"
         )
 
 ### AUTH ROUTES
@@ -233,7 +406,10 @@ async def login(user: UserLogin):
             user.email,
             user.password
         )
-        return {
+        logger.info(f"Login successful. Token type: {type(auth_data.token)}")
+        logger.info(f"Token: {auth_data.token[:20]}...")  # Log first 20 chars of token
+        
+        response_data = {
             "token": auth_data.token,
             "user": {
                 "id": auth_data.record.id,
@@ -241,7 +417,9 @@ async def login(user: UserLogin):
                 "name": auth_data.record.name,
             }
         }
+        return response_data
     except Exception as e:
+        logger.error(f"Login error: {str(e)}")
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"

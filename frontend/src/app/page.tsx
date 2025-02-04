@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from './contexts/auth';
+import { toast } from 'react-hot-toast';
 
 interface Store {
   id: string;
@@ -31,7 +32,7 @@ interface DeliveryQuote {
 
 // Mock user data
 const MOCK_ADDRESS = {
-  street: "25-20 31st Street",
+  street: "30-40 21st Street",
   unit: "Apt 4F",
   city: "Astoria",
   state: "NY",
@@ -53,6 +54,80 @@ const formatDeliveryTime = (isoTimestamp: string): string => {
     hour12: true
   });
 };
+
+async function handlePlaceOrder(
+  item: any,
+  store: any,
+  user: any,
+  quoteData: any,
+  deliveryAddress: any
+) {
+  try {
+    // Calculate time windows
+    const now = new Date()
+    const pickupReady = new Date(now.getTime() + 15 * 60000) // 15 minutes from now
+    const pickupDeadline = new Date(pickupReady.getTime() + 60 * 60000) // 1 hour after pickup ready
+    const dropoffReady = new Date(pickupReady.getTime() + 30 * 60000) // 30 minutes after pickup ready
+    const dropoffDeadline = new Date(dropoffReady.getTime() + 60 * 60000) // 1 hour after dropoff ready
+
+    const orderData = {
+      user_id: user.id,
+      store_id: store.id,
+      delivery_address: deliveryAddress,
+      subtotal_amount: item.price,
+      tax_amount: item.price * 0.08875, // NYC tax rate
+      delivery_fee: quoteData.fee,
+      total_amount: item.price + (item.price * 0.08875) + quoteData.fee,
+      estimated_delivery_time: quoteData.estimated_delivery_time,
+      pickup_ready_time: pickupReady.toISOString(),
+      pickup_deadline_time: pickupDeadline.toISOString(),
+      dropoff_ready_time: dropoffReady.toISOString(),
+      dropoff_deadline_time: dropoffDeadline.toISOString(),
+      items: [
+        {
+          store_item_id: item.id,
+          name: item.name,
+          quantity: 1,
+          price: item.price
+        }
+      ]
+    }
+
+    const response = await fetch('/api/v0/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderData),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create order')
+    }
+
+    const data = await response.json()
+    
+    // Show success message and tracking link
+    toast.success(
+      <div>
+        Order placed successfully!{' '}
+        <a
+          href={data.tracking_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800"
+        >
+          Track your delivery →
+        </a>
+      </div>,
+      { duration: 10000 }
+    )
+
+  } catch (error) {
+    console.error('Error placing order:', error)
+    toast.error('Failed to place order. Please try again.')
+  }
+}
 
 export default function Page() {
   const { user, login, signup, logout } = useAuth();
@@ -122,7 +197,7 @@ export default function Page() {
 
   const handleCheckout = async (item: StoreItem) => {
     if (!selectedStore) return;
-
+    
     setCheckoutItem({
       item,
       store: selectedStore
@@ -189,33 +264,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen flex flex-col items-center p-8">
-      <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white p-4 shadow-md">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">localmart</h1>
-          <div>
-            {user ? (
-              <div className="flex items-center gap-4">
-                <span>Welcome, {user.name}!</span>
-                <button 
-                  onClick={logout}
-                  className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setShowAuthModal(true)}
-                className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                Login / Sign Up
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <h1 className="text-3xl font-bold mb-8 mt-16">Stores</h1>
+      <h1 className="text-3xl font-bold mb-8">Stores</h1>
       
       {loading && (
         <div className="text-gray-600">Loading stores...</div>
