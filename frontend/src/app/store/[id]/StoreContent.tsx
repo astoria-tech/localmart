@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/auth';
 import { useCart } from '../../contexts/cart';
 import { toast } from 'react-hot-toast';
+import { FaInstagram, FaFacebook, FaTwitter } from 'react-icons/fa';
 
 interface Store {
   id: string;
@@ -13,6 +14,9 @@ interface Store {
   city: string;
   state: string;
   zip_code: string;
+  instagram?: string;
+  facebook?: string;
+  twitter?: string;
 }
 
 interface StoreItem {
@@ -98,12 +102,41 @@ export default function StoreContent({ storeId }: { storeId: string }) {
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl font-bold text-[#2D3748] mb-4">{store.name}</h1>
-            <p className="text-lg text-[#4A5568]">
+            <p className="text-lg text-[#4A5568] mb-4">
               {store.street_1}
               {store.street_2 && `, ${store.street_2}`}
               <br />
               {store.city}, {store.state} {store.zip_code}
             </p>
+            <div className="flex justify-center gap-6 mt-4">
+              <a
+                href="https://instagram.com/kinshipcoffee"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                aria-label="Instagram"
+              >
+                <FaInstagram className="w-7 h-7" />
+              </a>
+              <a
+                href="https://facebook.com/kinshipcoffee"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                aria-label="Facebook"
+              >
+                <FaFacebook className="w-7 h-7" />
+              </a>
+              <a
+                href="https://twitter.com/kinshipcoffee"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                aria-label="Twitter"
+              >
+                <FaTwitter className="w-7 h-7" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
