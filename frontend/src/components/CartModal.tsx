@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCart } from '@/app/contexts/cart';
@@ -10,8 +10,39 @@ interface CartModalProps {
   onClose: () => void;
 }
 
+interface Store {
+  id: string;
+  name: string;
+}
+
 export default function CartModal({ isOpen, onClose }: CartModalProps) {
   const { items, updateQuantity, removeItem, totalPrice } = useCart();
+  const [store, setStore] = useState<Store | null>(null);
+
+  // Fetch store details when items change
+  useEffect(() => {
+    const fetchStore = async () => {
+      if (items.length > 0) {
+        try {
+          const response = await fetch(`http://localhost:8000/api/v0/stores/${items[0].store}`);
+          if (!response.ok) {
+            console.error(`Failed to fetch store: ${response.status} ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Error details:', errorData);
+            return;
+          }
+          const storeData = await response.json();
+          setStore(storeData);
+        } catch (error) {
+          console.error('Error fetching store:', error);
+        }
+      } else {
+        setStore(null);
+      }
+    };
+
+    fetchStore();
+  }, [items]);
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -44,9 +75,16 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                   <div className="flex h-full flex-col overflow-y-scroll bg-[#F5F2EB] shadow-xl">
                     <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
                       <div className="flex items-start justify-between">
-                        <Dialog.Title className="heading-medium text-[#2D3748]">
-                          Shopping cart
-                        </Dialog.Title>
+                        <div>
+                          <Dialog.Title className="heading-medium text-[#2D3748]">
+                            Shopping cart
+                          </Dialog.Title>
+                          {store && (
+                            <p className="mt-1 text-[#4A5568] text-sm">
+                              at {store.name}
+                            </p>
+                          )}
+                        </div>
                         <div className="ml-3 flex h-7 items-center">
                           <button
                             type="button"
