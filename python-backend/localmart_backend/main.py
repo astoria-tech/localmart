@@ -94,6 +94,7 @@ class UserSignup(BaseModel):
 class DeliveryQuoteRequest(BaseModel):
     store_id: str
     item_id: str  # Add item_id to get the price
+    delivery_address: Dict
 
 app = FastAPI(
     title="LocalMart Backend",
@@ -180,7 +181,7 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
             'street_address': [store.street_1],
             'city': store.city,
             'state': store.state,
-            'zip_code': '11102',
+            'zip_code': store.zip,
             'country': 'US'
         }
 
@@ -257,7 +258,7 @@ async def create_order(
             'street_address': [store.street_1],
             'city': store.city,
             'state': store.state,
-            'zip_code': '11102',
+            'zip_code': store.zip,
             'country': 'US'
         }
 
