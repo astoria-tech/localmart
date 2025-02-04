@@ -54,6 +54,14 @@ export default function Header() {
               >
                 Order History
               </button>
+              <a
+                href="http://localhost:8090/_/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                Admin Dashboard
+              </a>
               <button
                 onClick={logout}
                 className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"

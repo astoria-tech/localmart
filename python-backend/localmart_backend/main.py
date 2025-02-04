@@ -1,14 +1,16 @@
-from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request
-from pocketbase import PocketBase
-from typing import List, Dict, Set
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import os
-import httpx
+import asyncio
+import base64
 import datetime
 import json
-import asyncio
 import logging
+import os
+from typing import List, Dict, Set
+
+from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pocketbase import PocketBase
+from pydantic import BaseModel
+
 from .uber_direct import UberDirectClient
 
 # Initialize logging
@@ -29,13 +31,31 @@ uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SEC
 # Track active deliveries
 active_deliveries: Set[str] = set()
 
+def decode_jwt(token):
+    # Split the token into parts
+    parts = token.split('.')
+    if len(parts) != 3:
+        return "Not a valid JWT token format"
+
+    # Decode the payload (second part)
+    try:
+        # Add padding if needed
+        padding = len(parts[1]) % 4
+        if padding:
+            parts[1] += '=' * (4 - padding)
+
+        payload = base64.b64decode(parts[1])
+        return json.loads(payload)
+    except Exception as e:
+        return f"Error decoding token: {str(e)}"
+
 async def poll_delivery_status(delivery_id: str, order_id: str):
     """Poll Uber Direct API for delivery status updates"""
     try:
         while delivery_id in active_deliveries:
             delivery_data = await uber_client.get_delivery_status(delivery_id)
             status = delivery_data['status']
-            
+
             # Update order status in PocketBase
             pb.collection('orders').update(order_id, {
                 'status': status
@@ -74,7 +94,6 @@ class UserSignup(BaseModel):
 class DeliveryQuoteRequest(BaseModel):
     store_id: str
     item_id: str  # Add item_id to get the price
-    delivery_address: Dict
 
 app = FastAPI(
     title="LocalMart Backend",
@@ -151,11 +170,11 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
     try:
         # Get store details
         store = pb.collection('stores').get_one(request.store_id)
-        
+
         # Get item details
         item = pb.collection('store_items').get_one(request.item_id)
         item_price_cents = int(item.price * 100)  # Convert to cents
-        
+
         # Prepare addresses
         pickup_address = {
             'street_address': [store.street_1],
@@ -164,14 +183,14 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
             'zip_code': '11102',
             'country': 'US'
         }
-        
+
         # Calculate time windows
         now = datetime.datetime.now(datetime.timezone.utc)
         pickup_ready = now + datetime.timedelta(minutes=15)
         pickup_deadline = pickup_ready + datetime.timedelta(hours=1)
         dropoff_ready = pickup_ready + datetime.timedelta(minutes=30)
         dropoff_deadline = dropoff_ready + datetime.timedelta(hours=1)
-        
+
         # Get quote from Uber Direct
         quote_data = await uber_client.get_delivery_quote(
             pickup_address=pickup_address,
@@ -182,7 +201,7 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
             dropoff_deadline=dropoff_deadline,
             item_price_cents=item_price_cents
         )
-        
+
         return {
             'fee': quote_data['fee'],
             'currency': quote_data['currency'],
@@ -232,7 +251,7 @@ async def create_order(
 
         # Get store details
         store = pb.collection('stores').get_one(request['store_id'])
-        
+
         # Prepare pickup address
         pickup_address = {
             'street_address': [store.street_1],
@@ -241,7 +260,7 @@ async def create_order(
             'zip_code': '11102',
             'country': 'US'
         }
-        
+
         # Prepare manifest items
         manifest_items = [
             {
@@ -251,7 +270,7 @@ async def create_order(
             }
             for item in request['items']
         ]
-        
+
         # Create delivery in Uber Direct
         delivery_data = await uber_client.create_delivery(
             pickup_address=pickup_address,
@@ -263,7 +282,7 @@ async def create_order(
             total_amount=request['total_amount'],
             manifest_items=manifest_items
         )
-        
+
         # Update order with Uber delivery details
         pb.collection('orders').update(order.id, {
             'uber_delivery_id': delivery_data['id'],
@@ -295,72 +314,57 @@ async def create_order(
 @app.get("/api/v0/orders", response_model=List[Dict])
 async def get_user_orders(request: Request):
     """Get orders for the authenticated user"""
-    try:
-        # Get auth token from header
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-        
-        token = auth_header.split(' ')[1]
-        logger.info(f"Received token in orders endpoint: {token[:20]}...")  # Log first 20 chars of token
-        
-        try:
-            # Update the auth store with the token
-            pb.auth_store.save(token, None)  # The second parameter is the model which we'll get from the token
-            
-            if not pb.auth_store.isValid:
-                raise Exception("Token is not valid")
-                
-            user_id = pb.auth_store.model.id
-            logger.info(f"Successfully authenticated user: {user_id}")
-        except Exception as e:
-            logger.error(f"Auth error: {str(e)}")
-            raise HTTPException(status_code=401, detail="Invalid token")
+    # Get auth token from header
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
 
-        # Get user's orders
-        orders = pb.collection('orders').get_list(
-            1, 50,  # Get up to 50 orders
-            filter=f'user = "{user_id}"',
-            sort='-created',
-            expand='store,order_items'
-        )
+    token = auth_header.split(' ')[1]
+    logger.info(f"Received token in orders endpoint: {token[:20]}...")  # Log first 20 chars of token
 
-        # Format orders for response
-        formatted_orders = []
-        for order in orders.items:
-            formatted_order = {
-                'id': order.id,
-                'created': order.created,
-                'status': order.status,
-                'delivery_fee': order.delivery_fee,
-                'total_amount': order.total_amount,
-                'uber_tracking_url': order.uber_tracking_url,
-                'store': {
-                    'id': order.expand.store.id,
-                    'name': order.expand.store.name
-                } if order.expand.get('store') else None,
-                'items': [
-                    {
-                        'id': item.id,
-                        'name': item.name,
-                        'quantity': item.quantity,
-                        'price': item.price_at_time
-                    }
-                    for item in order.expand.get('order_items', [])
-                ]
-            }
-            formatted_orders.append(formatted_order)
+    decoded_token = decode_jwt(token)
+    print("Decoded token payload:", json.dumps(decoded_token, indent=2))
 
-        return formatted_orders
+    # FIXME: Multiple sessions need to be tested, this may just be using the last logged in user
+    user_id = decoded_token['id']
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching orders: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch orders: {str(e)}"
-        )
+    # Get user's orders
+    orders = pb.collection('orders').get_list(
+        1, 50,  # Get up to 50 orders
+        query_params={
+            "filter": f'user = "{user_id}"',
+            "sort": "-created",
+            "expand": "store,order_items"
+        }
+    )
+
+    # Format orders for response
+    formatted_orders = []
+    for order in orders.items:
+        formatted_order = {
+            'id': order.id,
+            'created': order.created,
+            'status': order.status,
+            'delivery_fee': order.delivery_fee,
+            'total_amount': order.total_amount,
+            'uber_tracking_url': order.uber_tracking_url,
+            'store': {
+                'id': order.expand.store.id,
+                'name': order.expand.store.name
+            } if order.expand.get('store') else None,
+            'items': [
+                {
+                    'id': item.id,
+                    'name': item.name,
+                    'quantity': item.quantity,
+                    'price': item.price_at_time
+                }
+                for item in order.expand.get('order_items', [])
+            ]
+        }
+        formatted_orders.append(formatted_order)
+
+    return formatted_orders
 
 ### AUTH ROUTES
 
@@ -408,7 +412,7 @@ async def login(user: UserLogin):
         )
         logger.info(f"Login successful. Token type: {type(auth_data.token)}")
         logger.info(f"Token: {auth_data.token[:20]}...")  # Log first 20 chars of token
-        
+
         response_data = {
             "token": auth_data.token,
             "user": {
