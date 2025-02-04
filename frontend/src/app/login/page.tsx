@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, signup } = useAuth();
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
@@ -13,6 +16,11 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Set signup mode if signup=true in URL
+    setIsSignup(searchParams.get('signup') === 'true');
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,104 +41,113 @@ export default function LoginPage() {
     }
   };
 
+  const toggleMode = () => {
+    setIsSignup(!isSignup);
+    setError('');
+    // Update URL without refreshing the page
+    const newUrl = !isSignup ? '/login?signup=true' : '/login';
+    window.history.pushState({}, '', newUrl);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F2EB] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="mb-8">
+        <Link href="/" className="flex items-center gap-2 group">
+          <BuildingStorefrontIcon className="h-7 w-7 text-[#2A9D8F] group-hover:text-[#40B4A6] transition-colors" />
+          <span className="text-2xl font-bold font-display text-[#2A9D8F] group-hover:text-[#40B4A6] transition-colors">localmart</span>
+        </Link>
+      </div>
+      <div className="max-w-md w-full">
+        <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm p-8">
+          <h2 className="text-center text-3xl font-bold text-[#2D3748] mb-8">
             {isSignup ? 'Create your account' : 'Sign in to your account'}
           </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            {isSignup && (
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              {isSignup && (
+                <div>
+                  <label htmlFor="name" className="sr-only">
+                    Name
+                  </label>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    required={isSignup}
+                    className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
+                    placeholder="Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+              )}
               <div>
-                <label htmlFor="name" className="sr-only">
-                  Name
+                <label htmlFor="email-address" className="sr-only">
+                  Email address
                 </label>
                 <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required={isSignup}
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  id="email-address"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
+              <div>
+                <label htmlFor="password" className="sr-only">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="text-red-500 text-sm text-center">{error}</div>
             )}
+
             <div>
-              <label htmlFor="email-address" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 ${
-                  isSignup ? '' : 'rounded-t-md'
-                } focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm`}
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-white bg-[#2A9D8F] hover:bg-[#40B4A6] active:bg-[#1E7268] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2A9D8F] transition-colors duration-200"
+              >
+                {isLoading ? (
+                  'Loading...'
+                ) : isSignup ? (
+                  'Sign up'
+                ) : (
+                  'Sign in'
+                )}
+              </button>
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+
+            <div className="text-sm text-center">
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="font-medium text-[#2A9D8F] hover:text-[#40B4A6]"
+              >
+                {isSignup
+                  ? 'Already have an account? Login'
+                  : "Don't have an account? Sign up"}
+              </button>
             </div>
-          </div>
-
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              {isLoading ? (
-                'Loading...'
-              ) : isSignup ? (
-                'Sign up'
-              ) : (
-                'Sign in'
-              )}
-            </button>
-          </div>
-
-          <div className="text-sm text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignup(!isSignup);
-                setError('');
-              }}
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              {isSignup
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

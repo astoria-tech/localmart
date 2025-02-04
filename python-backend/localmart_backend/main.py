@@ -145,6 +145,19 @@ async def list_stores():
             detail="Issue fetching stores"
         )
 
+@app.get("/api/v0/stores/{store_id}", response_model=Dict)
+async def get_store(store_id: str):
+    """Get a single store by ID"""
+    try:
+        # Get the store record
+        store = pb.collection('stores').get_one(store_id)
+        return serialize_store(store)
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Store not found: {str(e)}"
+        )
+
 @app.get("/api/v0/stores/{store_id}/items", response_model=List[Dict])
 async def list_store_items(store_id: str):
     """List all items for a specific store"""
@@ -440,7 +453,8 @@ def serialize_store(store) -> Dict:
         "street_1": store.street_1,
         "street_2": store.street_2,
         "city": store.city,
-        "state": store.state
+        "state": store.state,
+        "zip_code": store.zip  # PocketBase field is 'zip' but we send as 'zip_code'
     }
 
 def serialize_store_item(item) -> Dict:
