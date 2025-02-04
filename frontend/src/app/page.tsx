@@ -89,20 +89,31 @@ export default function Page() {
 
       {/* Stores Grid */}
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {stores.map((store) => (
             <Link
               key={store.id}
               href={`/store/${store.id}`}
-              className="block bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-6 hover:bg-white"
+              className="bg-white/80 backdrop-blur-sm rounded-lg p-6 hover:bg-white transition-all duration-200 group"
             >
-              <h2 className="text-xl font-semibold text-[#2D3748] mb-2">{store.name}</h2>
-              <p className="text-[#4A5568]">
-                {store.street_1}
-                {store.street_2 && `, ${store.street_2}`}
-                <br />
-                {store.city}, {store.state} {store.zip_code}
-              </p>
+              <div className="flex gap-4">
+                <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
+                  <img
+                    src={`https://picsum.photos/seed/${store.id}/200/200`}
+                    alt={store.name}
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
+                  />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-[#2D3748] mb-2">{store.name}</h2>
+                  <p className="text-[#4A5568]">
+                    {store.street_1}
+                    {store.street_2 && `, ${store.street_2}`}
+                    <br />
+                    {store.city}, {store.state} {store.zip_code}
+                  </p>
+                </div>
+              </div>
             </Link>
           ))}
         </div>
