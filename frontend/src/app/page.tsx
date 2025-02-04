@@ -41,7 +41,7 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <main className="min-h-[calc(100vh-64px)] bg-gray-50 pt-16">
         <div className="container mx-auto px-4">
           <div className="animate-pulse">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -51,30 +51,30 @@ export default function Page() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <main className="min-h-[calc(100vh-64px)] bg-gray-50 pt-16">
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900">Error</h2>
             <p className="mt-2 text-gray-600">{error}</p>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <main className="min-h-[calc(100vh-64px)] bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-white border-b">
+      <div className="bg-white border-b pt-16">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">LocalMart</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">localmart</h1>
             <p className="text-lg text-gray-600">
               Shop from your favorite local stores with same-day delivery
             </p>
@@ -102,6 +102,6 @@ export default function Page() {
           ))}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LocalMart",
+  title: "localmart",
   description: "Local delivery marketplace",
 };
 
