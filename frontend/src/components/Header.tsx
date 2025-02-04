@@ -47,7 +47,7 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-50">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-2xl font-bold">
+          <Link href="/" className="text-2xl font-bold font-display text-white">
             localmart
           </Link>
           {user && (
@@ -64,7 +64,7 @@ export default function Header() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              <span>Welcome, {user.name}!</span>
+              <span className="text-white">Welcome, {user.name}!</span>
               <button
                 onClick={handleShowOrderHistory}
                 className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"

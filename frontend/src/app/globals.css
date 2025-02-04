@@ -25,8 +25,71 @@
   }
 }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-text-primary);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  /* Base typography styles */
+  body {
+    @apply bg-[var(--color-background)] text-[var(--color-text-primary)] font-normal leading-relaxed;
+    font-family: var(--font-inter);
+  }
+
+  /* Headings use DM Sans for warmth */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-dm-sans);
+    @apply font-medium tracking-tight;
+  }
+
+  /* Specific heading styles */
+  h1 {
+    @apply text-4xl md:text-5xl leading-tight;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    @apply text-3xl md:text-4xl leading-tight;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    @apply text-2xl md:text-3xl leading-snug;
+  }
+
+  /* Body text styles */
+  p {
+    @apply text-base leading-relaxed;
+  }
+
+  /* Link styles */
+  a {
+    @apply text-[var(--color-brand)] hover:text-[var(--color-brand-light)] transition-colors;
+  }
+
+  /* Button text */
+  button, .button {
+    font-family: var(--font-inter);
+    @apply font-medium;
+  }
+}
+
+/* Utility classes for typography */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .heading-large {
+    @apply font-medium text-4xl md:text-5xl tracking-tight leading-tight;
+    letter-spacing: -0.02em;
+  }
+
+  .heading-medium {
+    @apply font-medium text-2xl md:text-3xl tracking-tight leading-snug;
+  }
+
+  .body-large {
+    @apply text-lg leading-relaxed;
+  }
+
+  .body-small {
+    @apply text-sm leading-relaxed;
+  }
 }
