@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/auth';
 import { useCart } from '../../contexts/cart';
 import { toast } from 'react-hot-toast';
-import { FaInstagram, FaFacebook, FaTwitter } from 'react-icons/fa';
+import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
+import { SiBluesky } from 'react-icons/si';
 
 interface Store {
   id: string;
@@ -23,6 +24,7 @@ interface StoreItem {
   id: string;
   name: string;
   price: number;
+  imageUrl?: string;
 }
 
 export default function StoreContent({ storeId }: { storeId: string }) {
@@ -54,7 +56,14 @@ export default function StoreContent({ storeId }: { storeId: string }) {
           throw new Error('Failed to fetch store items');
         }
         const itemsData = await itemsResponse.json();
-        setItems(itemsData);
+        
+        // Add mock image URLs to items
+        const itemsWithImages = itemsData.map((item: StoreItem) => ({
+          ...item,
+          imageUrl: `https://picsum.photos/seed/${item.id}/400/300`
+        }));
+        
+        setItems(itemsWithImages);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch store data');
       } finally {
@@ -128,13 +137,22 @@ export default function StoreContent({ storeId }: { storeId: string }) {
                 <FaFacebook className="w-7 h-7" />
               </a>
               <a
-                href="https://twitter.com/kinshipcoffee"
+                href="https://x.com/kinshipcoffee"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
-                aria-label="Twitter"
+                aria-label="X (formerly Twitter)"
               >
-                <FaTwitter className="w-7 h-7" />
+                <FaXTwitter className="w-7 h-7" />
+              </a>
+              <a
+                href="https://bsky.app/profile/kinshipcoffee.bsky.social"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                aria-label="Bluesky Social"
+              >
+                <SiBluesky className="w-7 h-7" />
               </a>
             </div>
           </div>
@@ -143,14 +161,21 @@ export default function StoreContent({ storeId }: { storeId: string }) {
 
       {/* Items Grid */}
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {items.map((item) => (
             <div
               key={item.id}
-              className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-6 hover:bg-white"
+              className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-4 hover:bg-white overflow-hidden"
             >
-              <h3 className="text-lg font-semibold text-[#2D3748] mb-2">{item.name}</h3>
-              <p className="text-[#4A5568] mb-4">${item.price.toFixed(2)}</p>
+              <div className="aspect-w-4 aspect-h-3 mb-3 rounded-md overflow-hidden">
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-200"
+                />
+              </div>
+              <h3 className="text-base font-semibold text-[#2D3748] mb-1">{item.name}</h3>
+              <p className="text-[#4A5568] mb-3">${item.price.toFixed(2)}</p>
               <button
                 onClick={() => {
                   addItem({

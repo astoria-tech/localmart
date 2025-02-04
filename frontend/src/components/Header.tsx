@@ -91,12 +91,20 @@ export default function Header() {
               </button>
             </>
           ) : (
-            <Link
-              href="/login"
-              className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
-            >
-              Login / Sign Up
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                href="/login?signup=true"
+                className="bg-white/90 backdrop-blur-sm text-[#2A9D8F] px-4 py-2 rounded-lg hover:bg-white transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
           )}
         </div>
       </div>
