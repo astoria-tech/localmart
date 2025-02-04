@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 
 interface CartItem {
   id: string;
@@ -40,6 +41,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
     setItems(currentItems => {
+      // If cart is empty, add the item
+      if (currentItems.length === 0) {
+        return [{ ...newItem, quantity: 1 }];
+      }
+
+      // Check if the new item is from the same store
+      const existingStoreId = currentItems[0].store;
+      if (newItem.store !== existingStoreId) {
+        toast.error('Cannot add items from different stores. Please clear your cart first.');
+        return currentItems;
+      }
+
+      // Add or update item quantity
       const existingItem = currentItems.find(item => item.id === newItem.id);
       if (existingItem) {
         return currentItems.map(item =>

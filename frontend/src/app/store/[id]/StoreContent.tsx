@@ -22,11 +22,16 @@ interface StoreItem {
 }
 
 export default function StoreContent({ storeId }: { storeId: string }) {
+  const { addItem } = useCart();
   const [store, setStore] = useState<Store | null>(null);
   const [items, setItems] = useState<StoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { addItem } = useCart();
+  const { items: cartItems } = useCart();
+
+  // Check if cart has items from a different store
+  const hasItemsFromDifferentStore = cartItems.length > 0 && cartItems[0].store !== storeId;
+  const currentCartStoreName = hasItemsFromDifferentStore ? store?.name : null;
 
   useEffect(() => {
     const fetchStoreAndItems = async () => {
@@ -119,7 +124,9 @@ export default function StoreContent({ storeId }: { storeId: string }) {
                     ...item,
                     store: storeId
                   });
-                  toast.success('Added to cart');
+                  if (!hasItemsFromDifferentStore) {
+                    toast.success('Added to cart');
+                  }
                 }}
                 className="w-full bg-[#2A9D8F] text-white py-2 px-4 rounded-md hover:bg-[#40B4A6] active:bg-[#1E7268] transition-colors duration-200"
               >
