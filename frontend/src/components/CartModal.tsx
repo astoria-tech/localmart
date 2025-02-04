@@ -25,7 +25,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+          <div className="fixed inset-0 bg-[#2D3748] bg-opacity-75 transition-opacity backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-hidden">
@@ -41,14 +41,14 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                 leaveTo="translate-x-full"
               >
                 <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
-                  <div className="flex h-full flex-col overflow-y-scroll bg-white shadow-xl">
+                  <div className="flex h-full flex-col overflow-y-scroll bg-[#F5F2EB] shadow-xl">
                     <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
                       <div className="flex items-start justify-between">
-                        <Dialog.Title className="text-lg font-medium text-gray-900">Shopping cart</Dialog.Title>
+                        <Dialog.Title className="text-lg font-medium text-[#2D3748]">Shopping cart</Dialog.Title>
                         <div className="ml-3 flex h-7 items-center">
                           <button
                             type="button"
-                            className="relative -m-2 p-2 text-gray-400 hover:text-gray-500"
+                            className="relative -m-2 p-2 text-[#4A5568] hover:text-[#2D3748]"
                             onClick={onClose}
                           >
                             <span className="absolute -inset-0.5" />
@@ -60,19 +60,19 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
 
                       <div className="mt-8">
                         <div className="flow-root">
-                          <ul role="list" className="-my-6 divide-y divide-gray-200">
+                          <ul role="list" className="-my-6 divide-y divide-[#2A9D8F]/10">
                             {items.map((item) => (
                               <li key={item.id} className="flex py-6">
                                 <div className="flex-1 ml-4">
                                   <div className="flex items-start justify-between">
                                     <div>
-                                      <h3 className="text-base font-medium text-gray-900">{item.name}</h3>
-                                      <p className="mt-1 text-sm text-gray-500">${item.price.toFixed(2)}</p>
+                                      <h3 className="text-base font-medium text-[#2D3748]">{item.name}</h3>
+                                      <p className="mt-1 text-sm text-[#4A5568]">${item.price.toFixed(2)}</p>
                                     </div>
                                     <button
                                       type="button"
                                       onClick={() => removeItem(item.id)}
-                                      className="ml-4 text-sm font-medium text-blue-600 hover:text-blue-500"
+                                      className="ml-4 text-sm font-medium text-[#2A9D8F] hover:text-[#40B4A6]"
                                     >
                                       Remove
                                     </button>
@@ -81,15 +81,15 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                                     <button
                                       type="button"
                                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                      className="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                                      className="rounded-md bg-white/80 px-2.5 py-1.5 text-sm font-semibold text-[#2D3748] shadow-sm ring-1 ring-inset ring-[#2A9D8F]/20 hover:bg-white hover:ring-[#2A9D8F]/30"
                                     >
                                       -
                                     </button>
-                                    <span className="mx-4 text-gray-900">{item.quantity}</span>
+                                    <span className="mx-4 text-[#2D3748]">{item.quantity}</span>
                                     <button
                                       type="button"
                                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                      className="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                                      className="rounded-md bg-white/80 px-2.5 py-1.5 text-sm font-semibold text-[#2D3748] shadow-sm ring-1 ring-inset ring-[#2A9D8F]/20 hover:bg-white hover:ring-[#2A9D8F]/30"
                                     >
                                       +
                                     </button>
@@ -102,16 +102,16 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-200 px-4 py-6 sm:px-6">
-                      <div className="flex justify-between text-base font-medium text-gray-900">
+                    <div className="border-t border-[#2A9D8F]/10 bg-white/50 backdrop-blur-sm px-4 py-6 sm:px-6">
+                      <div className="flex justify-between text-base font-medium text-[#2D3748]">
                         <p>Total</p>
                         <p>${totalPrice.toFixed(2)}</p>
                       </div>
-                      <p className="mt-0.5 text-sm text-gray-500">Shipping and taxes calculated at checkout.</p>
+                      <p className="mt-0.5 text-sm text-[#4A5568]">Shipping and taxes calculated at checkout.</p>
                       <div className="mt-6">
                         <a
                           href="#"
-                          className="flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700"
+                          className="flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268]"
                         >
                           Checkout
                         </a>

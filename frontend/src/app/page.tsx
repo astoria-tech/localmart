@@ -11,6 +11,7 @@ interface Store {
   street_2?: string;
   city: string;
   state: string;
+  zip_code: string;
 }
 
 export default function Page() {
@@ -41,12 +42,12 @@ export default function Page() {
 
   if (loading) {
     return (
-      <main className="min-h-[calc(100vh-64px)] bg-gray-50 pt-16">
+      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB] pt-16">
         <div className="container mx-auto px-4">
           <div className="animate-pulse">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-64 bg-gray-200 rounded-lg"></div>
+                <div key={i} className="h-64 bg-white/50 rounded-lg"></div>
               ))}
             </div>
           </div>
@@ -57,7 +58,7 @@ export default function Page() {
 
   if (error) {
     return (
-      <main className="min-h-[calc(100vh-64px)] bg-gray-50 pt-16">
+      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB] pt-16">
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900">Error</h2>
@@ -69,13 +70,13 @@ export default function Page() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-gray-50">
+    <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
-      <div className="bg-white border-b pt-16">
+      <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">localmart</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-4xl font-bold text-[#2D3748] mb-4">localmart</h1>
+            <p className="text-lg text-[#4A5568]">
               Shop from your favorite local stores with same-day delivery
             </p>
           </div>
@@ -89,14 +90,14 @@ export default function Page() {
             <Link
               key={store.id}
               href={`/store/${store.id}`}
-              className="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-6"
+              className="block bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-6 hover:bg-white"
             >
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">{store.name}</h2>
-              <p className="text-gray-600">
+              <h2 className="text-xl font-semibold text-[#2D3748] mb-2">{store.name}</h2>
+              <p className="text-[#4A5568]">
                 {store.street_1}
                 {store.street_2 && `, ${store.street_2}`}
                 <br />
-                {store.city}, {store.state}
+                {store.city}, {store.state} {store.zip_code}
               </p>
             </Link>
           ))}

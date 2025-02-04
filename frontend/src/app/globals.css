@@ -3,8 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Primary brand colors */
+  --color-brand: #2A9D8F; /* Warm turquoise that feels trustworthy but approachable */
+  --color-brand-light: #40B4A6; /* Lighter shade for hover states */
+  --color-brand-dark: #1E7268; /* Darker shade for active states */
+  
+  /* Background colors */
+  --color-background: #F5F2EB; /* Warm beige that feels cozy but clean */
+  --color-surface: #FFFFFF; /* Pure white for cards and surfaces */
+  
+  /* Text colors */
+  --color-text-primary: #2D3748; /* Softer than pure black */
+  --color-text-secondary: #4A5568; /* Muted text */
+  --color-text-light: #FFFFFF; /* White text for dark backgrounds */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,7 +26,7 @@
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }

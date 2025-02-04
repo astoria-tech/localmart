@@ -453,7 +453,8 @@ def serialize_store(store) -> Dict:
         "street_1": store.street_1,
         "street_2": store.street_2,
         "city": store.city,
-        "state": store.state
+        "state": store.state,
+        "zip_code": store.zip  # PocketBase field is 'zip' but we send as 'zip_code'
     }
 
 def serialize_store_item(item) -> Dict:

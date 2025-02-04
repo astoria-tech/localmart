@@ -12,6 +12,7 @@ interface Store {
   street_2?: string;
   city: string;
   state: string;
+  zip_code: string;
 }
 
 interface StoreItem {
@@ -57,46 +58,46 @@ export default function StoreContent({ storeId }: { storeId: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 pt-16">
+      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB] pt-16">
         <div className="container mx-auto px-4">
           <div className="animate-pulse">
-            <div className="h-32 bg-gray-200 rounded-lg mb-8"></div>
+            <div className="h-32 bg-white/50 rounded-lg mb-8"></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-64 bg-gray-200 rounded-lg"></div>
+                <div key={i} className="h-64 bg-white/50 rounded-lg"></div>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (error || !store) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 pt-16">
+      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB] pt-16">
         <div className="container mx-auto px-4">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900">Error</h2>
-            <p className="mt-2 text-gray-600">{error || 'Store not found'}</p>
+            <h2 className="text-2xl font-bold text-[#2D3748]">Error</h2>
+            <p className="mt-2 text-[#4A5568]">{error || 'Store not found'}</p>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <main className="flex-1 bg-gray-50">
+    <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
-      <div className="bg-white border-b pt-16">
+      <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">{store.name}</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-4xl font-bold text-[#2D3748] mb-4">{store.name}</h1>
+            <p className="text-lg text-[#4A5568]">
               {store.street_1}
               {store.street_2 && `, ${store.street_2}`}
               <br />
-              {store.city}, {store.state}
+              {store.city}, {store.state} {store.zip_code}
             </p>
           </div>
         </div>
@@ -108,16 +109,16 @@ export default function StoreContent({ storeId }: { storeId: string }) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-6"
+              className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-6 hover:bg-white"
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{item.name}</h3>
-              <p className="text-gray-600 mb-4">${item.price.toFixed(2)}</p>
+              <h3 className="text-lg font-semibold text-[#2D3748] mb-2">{item.name}</h3>
+              <p className="text-[#4A5568] mb-4">${item.price.toFixed(2)}</p>
               <button
                 onClick={() => {
                   addItem(item);
                   toast.success('Added to cart');
                 }}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200"
+                className="w-full bg-[#2A9D8F] text-white py-2 px-4 rounded-md hover:bg-[#40B4A6] active:bg-[#1E7268] transition-colors duration-200"
               >
                 Add to Cart
               </button>

@@ -44,7 +44,7 @@ export default function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 bg-blue-600 text-white p-4 shadow-md z-50">
+    <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-50">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-2xl font-bold">
@@ -55,7 +55,7 @@ export default function Header() {
               href="http://localhost:8090/_/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-100 hover:text-white transition-colors"
+              className="text-sm text-white/80 hover:text-white transition-colors"
             >
               admin
             </a>
@@ -67,19 +67,19 @@ export default function Header() {
               <span>Welcome, {user.name}!</span>
               <button
                 onClick={handleShowOrderHistory}
-                className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
               >
                 Order History
               </button>
               <button
                 onClick={logout}
-                className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
               >
                 Logout
               </button>
               <button
                 onClick={() => setShowCart(true)}
-                className="bg-white text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors relative"
+                className="bg-white/10 backdrop-blur-sm text-white p-2 rounded-lg hover:bg-white/20 transition-colors relative"
               >
                 <ShoppingCartIcon className="h-6 w-6" />
                 {totalItems > 0 && (
@@ -92,7 +92,7 @@ export default function Header() {
           ) : (
             <Link
               href="/login"
-              className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+              className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
             >
               Login / Sign Up
             </Link>
