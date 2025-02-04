@@ -1,13 +1,18 @@
 'use client';
 
 import { useAuth } from '../app/contexts/auth'
+import { useCart } from '../app/contexts/cart'
 import Link from 'next/link'
 import { useState } from 'react'
 import OrderHistoryModal from './OrderHistoryModal'
+import CartModal from './CartModal'
+import { ShoppingCartIcon } from '@heroicons/react/24/outline'
 
 export default function Header() {
   const { user, logout } = useAuth()
+  const { totalItems } = useCart()
   const [showOrderHistory, setShowOrderHistory] = useState(false)
+  const [showCart, setShowCart] = useState(false)
   const [orders, setOrders] = useState([])
 
   const handleShowOrderHistory = async () => {
@@ -68,6 +73,17 @@ export default function Header() {
               >
                 Logout
               </button>
+              <button
+                onClick={() => setShowCart(true)}
+                className="bg-white text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors relative"
+              >
+                <ShoppingCartIcon className="h-6 w-6" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                    {totalItems}
+                  </span>
+                )}
+              </button>
             </>
           ) : (
             <Link
@@ -84,6 +100,11 @@ export default function Header() {
         isOpen={showOrderHistory}
         onClose={() => setShowOrderHistory(false)}
         orders={orders}
+      />
+
+      <CartModal
+        isOpen={showCart}
+        onClose={() => setShowCart(false)}
       />
     </header>
   )
