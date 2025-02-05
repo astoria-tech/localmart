@@ -46,20 +46,25 @@ defmodule Search.Task do
 
   defp download_movies_data do
     data_dir = Path.join(:code.priv_dir(:search), "../data")
-    File.mkdir_p!(data_dir)
     target_path = Path.join(data_dir, "movies.json")
 
-    Logger.info("Downloading movies data to #{target_path}")
+    if File.exists?(target_path) do
+      Logger.info("Movies data already downloaded to #{target_path}")
+      {:ok, target_path}
+    else
+      Logger.info("Downloading movies data to #{target_path}")
 
-    case Req.get!(@movies_db) do
-      %{status: 200, body: body} ->
-        File.write!(target_path, body)
-        Logger.info("Successfully downloaded movies data")
-        {:ok, target_path}
+      case Req.get!(@movies_db) do
+        %{status: 200, body: body} ->
+          File.mkdir_p!(data_dir)
+          File.write!(target_path, body)
+          Logger.info("Successfully downloaded movies data")
+          {:ok, target_path}
 
-      response ->
-        Logger.error("Failed to download movies data: #{inspect(response)}")
-        {:error, :download_failed}
+        response ->
+          Logger.error("Failed to download movies data: #{inspect(response)}")
+          {:error, :download_failed}
+      end
     end
   end
 end
