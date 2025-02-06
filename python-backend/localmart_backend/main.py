@@ -330,6 +330,7 @@ async def get_user_orders(request: Request):
                 'status': order.status,
                 'delivery_fee': order.delivery_fee,
                 'total_amount': order.total_amount,
+                'tax_amount': order.tax_amount,
                 'customer_name': customer_name,
                 'delivery_address': delivery_address,
                 'stores': list(stores_dict.values())
