@@ -73,30 +73,37 @@ export default function Header() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              <span className="text-white">Welcome, {user.name}!</span>
-              <button
-                onClick={handleShowOrderHistory}
-                className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Order History
-              </button>
-              <button
-                onClick={logout}
-                className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Logout
-              </button>
-              <button
-                onClick={() => setShowCart(true)}
-                className="bg-white/10 backdrop-blur-sm text-white p-2 rounded-lg hover:bg-white/20 transition-colors relative"
-              >
-                <ShoppingCartIcon className="h-6 w-6" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                    {totalItems}
-                  </span>
-                )}
-              </button>
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/profile"
+                  className="text-sm text-white/80 hover:text-white transition-colors"
+                >
+                  Profile
+                </Link>
+                <button
+                  onClick={handleShowOrderHistory}
+                  className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  Order History
+                </button>
+                <button
+                  onClick={logout}
+                  className="bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  Logout
+                </button>
+                <button
+                  onClick={() => setShowCart(true)}
+                  className="bg-white/10 backdrop-blur-sm text-white p-2 rounded-lg hover:bg-white/20 transition-colors relative"
+                >
+                  <ShoppingCartIcon className="h-6 w-6" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+              </div>
             </>
           ) : (
             <div className="flex items-center gap-2">
