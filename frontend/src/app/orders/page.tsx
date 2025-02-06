@@ -22,6 +22,7 @@ interface Order {
   delivery_fee: number;
   total_amount: number;
   customer_name: string;
+  customer_phone?: string;
   delivery_address: {
     street_address: string[];
     city: string;
@@ -179,6 +180,9 @@ export default function OrdersDashboard() {
                   Customer
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
+                  Phone
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
                   Delivery Address
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
@@ -203,6 +207,9 @@ export default function OrdersDashboard() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
                     {order.customer_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
+                    {order.customer_phone || '-'}
                   </td>
                   <td className="px-6 py-4 text-sm text-[#4A5568]">
                     {order.delivery_address ? (

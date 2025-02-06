@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 interface UserProfile {
   first_name: string;
   last_name: string;
+  phone_number: string;
   street_1: string;
   street_2: string;
   city: string;
@@ -21,12 +22,32 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile>({
     first_name: '',
     last_name: '',
+    phone_number: '',
     street_1: '',
     street_2: '',
     city: '',
     state: '',
     zip: ''
   });
+
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    
+    // Format as (XXX) XXX-XXXX
+    if (digits.length <= 3) {
+      return digits;
+    } else if (digits.length <= 6) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    } else {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedNumber = formatPhoneNumber(e.target.value);
+    setProfile(prev => ({ ...prev, phone_number: formattedNumber }));
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -47,6 +68,7 @@ export default function ProfilePage() {
         setProfile({
           first_name: data.first_name || '',
           last_name: data.last_name || '',
+          phone_number: data.phone_number || '',
           street_1: data.street_1 || '',
           street_2: data.street_2 || '',
           city: data.city || '',
@@ -143,6 +165,23 @@ export default function ProfilePage() {
                     value={profile.last_name}
                     onChange={(e) => setProfile(prev => ({ ...prev, last_name: e.target.value }))}
                     className="mt-1 block w-full rounded-md border border-[#2A9D8F]/20 bg-white/50 py-2 px-3 shadow-sm focus:border-[#2A9D8F] focus:outline-none focus:ring-1 focus:ring-[#2A9D8F]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="phone_number" className="block text-sm font-medium text-[#2D3748]">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone_number"
+                    value={profile.phone_number}
+                    onChange={handlePhoneChange}
+                    maxLength={14} // (XXX) XXX-XXXX = 14 characters
+                    className="mt-1 block w-full rounded-md border border-[#2A9D8F]/20 bg-white/50 py-2 px-3 shadow-sm focus:border-[#2A9D8F] focus:outline-none focus:ring-1 focus:ring-[#2A9D8F]"
+                    placeholder="(555) 555-5555"
+                    pattern="\(\d{3}\) \d{3}-\d{4}"
+                    title="Phone number in format: (XXX) XXX-XXXX"
                   />
                 </div>
               </div>

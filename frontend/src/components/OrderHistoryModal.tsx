@@ -45,6 +45,7 @@ interface Order {
     state: string;
     zip_code: string;
   };
+  customer_phone?: string;
   stores: Store[];
 }
 
@@ -133,12 +134,6 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
                               {formatDateTime(order.created)}
                             </time>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-[#4A5568]">Total</p>
-                          <p className="text-lg font-medium text-[#2D3748]">
-                            {formatCurrency(order.total_amount)}
-                          </p>
                         </div>
                       </div>
 

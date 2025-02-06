@@ -332,6 +332,7 @@ async def get_user_orders(request: Request):
                 'total_amount': order.total_amount,
                 'tax_amount': order.tax_amount,
                 'customer_name': customer_name,
+                'customer_phone': getattr(user, 'phone_number', None),
                 'delivery_address': delivery_address,
                 'stores': list(stores_dict.values())
             }
@@ -461,6 +462,7 @@ async def get_profile(request: Request):
                 'first_name': getattr(user, 'first_name', ''),
                 'last_name': getattr(user, 'last_name', ''),
                 'email': user.email,
+                'phone_number': getattr(user, 'phone_number', ''),
                 'street_1': getattr(user, 'street_1', ''),
                 'street_2': getattr(user, 'street_2', ''),
                 'city': getattr(user, 'city', ''),
@@ -491,6 +493,7 @@ async def update_profile(request: Request):
             user = pb_service.update('users', user_id, {
                 'first_name': body.get('first_name'),
                 'last_name': body.get('last_name'),
+                'phone_number': body.get('phone_number'),
                 'street_1': body.get('street_1'),
                 'street_2': body.get('street_2'),
                 'city': body.get('city'),
@@ -502,6 +505,7 @@ async def update_profile(request: Request):
                 'first_name': getattr(user, 'first_name', ''),
                 'last_name': getattr(user, 'last_name', ''),
                 'email': user.email,
+                'phone_number': getattr(user, 'phone_number', ''),
                 'street_1': getattr(user, 'street_1', ''),
                 'street_2': getattr(user, 'street_2', ''),
                 'city': getattr(user, 'city', ''),
