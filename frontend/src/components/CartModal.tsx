@@ -4,6 +4,8 @@ import { Fragment, useEffect, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCart } from '@/app/contexts/cart';
+import { useAuth } from '@/app/contexts/auth';
+import { toast } from 'react-hot-toast';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -16,8 +18,10 @@ interface Store {
 }
 
 export default function CartModal({ isOpen, onClose }: CartModalProps) {
-  const { items, updateQuantity, removeItem, totalPrice } = useCart();
+  const { items, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
+  const { user } = useAuth();
   const [store, setStore] = useState<Store | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Fetch store details when items change
   useEffect(() => {
@@ -43,6 +47,82 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
 
     fetchStore();
   }, [items]);
+
+  const handleCheckout = async () => {
+    if (!user) {
+      toast.error('Please log in to checkout');
+      return;
+    }
+
+    if (!store) {
+      toast.error('Store information not found');
+      return;
+    }
+
+    setIsCheckingOut(true);
+
+    try {
+      // Calculate amounts
+      const subtotalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const taxRate = 0.08875; // Example tax rate (8.875%)
+      const taxAmount = subtotalAmount * taxRate;
+      const deliveryFee = 5.99; // Example delivery fee
+      const totalAmount = subtotalAmount + taxAmount + deliveryFee;
+
+      // Create order payload
+      const orderData = {
+        user_id: user.id,
+        store_id: store.id,
+        items: items.map(item => ({
+          store_item_id: item.id,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        subtotal_amount: subtotalAmount,
+        tax_amount: taxAmount,
+        delivery_fee: deliveryFee,
+        total_amount: totalAmount,
+        delivery_address: {
+          street_address: ["123 Main St"], // TODO: Get from user input
+          city: "New York",
+          state: "NY",
+          zip_code: "10001"
+        },
+        customer_notes: "" // TODO: Add notes field if needed
+      };
+
+      // Create the order
+      const response = await fetch('http://localhost:8000/api/v0/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create order');
+      }
+
+      const data = await response.json();
+      
+      // Clear the cart
+      clearCart();
+      
+      // Show success message
+      toast.success('Order placed successfully!');
+      
+      // Close the modal
+      onClose();
+
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast.error('Failed to place order. Please try again.');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -144,19 +224,24 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
 
                     <div className="border-t border-[#2A9D8F]/10 bg-white/50 backdrop-blur-sm px-4 py-6 sm:px-6">
                       <div className="flex justify-between text-lg font-medium text-[#2D3748]">
-                        <p>Total</p>
+                        <p>Subtotal</p>
                         <p>${totalPrice.toFixed(2)}</p>
                       </div>
                       <p className="mt-0.5 body-small text-[#4A5568]">
-                        Shipping and taxes calculated at checkout.
+                        Shipping and taxes will be calculated at checkout.
                       </p>
                       <div className="mt-6">
-                        <a
-                          href="#"
-                          className="flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268]"
+                        <button
+                          onClick={handleCheckout}
+                          disabled={isCheckingOut || items.length === 0}
+                          className="w-full flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Checkout
-                        </a>
+                          {isCheckingOut ? (
+                            'Processing...'
+                          ) : (
+                            'Checkout'
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>

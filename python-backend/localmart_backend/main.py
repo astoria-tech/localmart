@@ -49,38 +49,6 @@ def decode_jwt(token):
     except Exception as e:
         return f"Error decoding token: {str(e)}"
 
-async def poll_delivery_status(delivery_id: str, order_id: str):
-    """Poll Uber Direct API for delivery status updates"""
-    try:
-        while delivery_id in active_deliveries:
-            delivery_data = await uber_client.get_delivery_status(delivery_id)
-            status = delivery_data['status']
-
-            # Update order status in PocketBase
-            pb.collection('orders').update(order_id, {
-                'status': status
-            })
-
-            # Create status update record
-            pb.collection('order_status_updates').create({
-                'order': order_id,
-                'status': status,
-                'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                'details': delivery_data
-            })
-
-            # Remove from active deliveries if in terminal state
-            if status in ['delivered', 'cancelled']:
-                active_deliveries.remove(delivery_id)
-                logger.info(f"Delivery {delivery_id} completed with status: {status}")
-                break
-
-            # Poll every 30 seconds
-            await asyncio.sleep(30)
-    except Exception as e:
-        logger.error(f"Error polling delivery {delivery_id}: {str(e)}")
-        active_deliveries.remove(delivery_id)
-
 class UserLogin(BaseModel):
     email: str
     password: str
@@ -230,27 +198,21 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
         )
 
 @app.post("/api/v0/orders", response_model=Dict)
-async def create_order(
-    background_tasks: BackgroundTasks,
-    request: Dict
-):
-    """Create a new order and initiate Uber delivery"""
+async def create_order(request: Dict):
+    """Create a new order with basic status tracking"""
     try:
-        # First create the order in PocketBase
+        # Create the order in PocketBase with simplified fields
         order = pb.collection('orders').create({
             'user': request['user_id'],
             'store': request['store_id'],
-            'status': 'pending',
-            'delivery_address': request['delivery_address'],
+            'status': 'pending',  # Initial status
             'subtotal_amount': request['subtotal_amount'],
             'tax_amount': request['tax_amount'],
             'delivery_fee': request['delivery_fee'],
             'total_amount': request['total_amount'],
-            'estimated_delivery_time': request['estimated_delivery_time'],
-            'pickup_ready_time': request['pickup_ready_time'],
-            'pickup_deadline_time': request['pickup_deadline_time'],
-            'dropoff_ready_time': request['dropoff_ready_time'],
-            'dropoff_deadline_time': request['dropoff_deadline_time']
+            'delivery_address': request['delivery_address'],
+            'customer_notes': request.get('customer_notes', ''),
+            'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         })
 
         # Create order items
@@ -263,59 +225,10 @@ async def create_order(
                 'total_price': item['price'] * item['quantity']
             })
 
-        # Get store details
-        store = pb.collection('stores').get_one(request['store_id'])
-
-        # Prepare pickup address
-        pickup_address = {
-            'street_address': [store.street_1],
-            'city': store.city,
-            'state': store.state,
-            'zip_code': store.zip,
-            'country': 'US'
-        }
-
-        # Prepare manifest items
-        manifest_items = [
-            {
-                'name': item['name'],
-                'quantity': item['quantity'],
-                'price': int(item['price'] * 100)
-            }
-            for item in request['items']
-        ]
-
-        # Create delivery in Uber Direct
-        delivery_data = await uber_client.create_delivery(
-            pickup_address=pickup_address,
-            dropoff_address=request['delivery_address'],
-            pickup_ready=request['pickup_ready_time'],
-            pickup_deadline=request['pickup_deadline_time'],
-            dropoff_ready=request['dropoff_ready_time'],
-            dropoff_deadline=request['dropoff_deadline_time'],
-            total_amount=request['total_amount'],
-            manifest_items=manifest_items
-        )
-
-        # Update order with Uber delivery details
-        pb.collection('orders').update(order.id, {
-            'uber_delivery_id': delivery_data['id'],
-            'uber_tracking_url': delivery_data['tracking_url'],
-            'status': 'confirmed'
-        })
-
-        # Start polling for updates
-        active_deliveries.add(delivery_data['id'])
-        background_tasks.add_task(
-            poll_delivery_status,
-            delivery_data['id'],
-            order.id
-        )
-
         return {
             'order_id': order.id,
-            'uber_delivery_id': delivery_data['id'],
-            'tracking_url': delivery_data['tracking_url']
+            'status': 'pending',
+            'message': 'Order created successfully'
         }
 
     except Exception as e:
@@ -323,6 +236,140 @@ async def create_order(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create order: {str(e)}"
+        )
+
+@app.get("/api/v0/orders/store/{store_id}", response_model=List[Dict])
+async def get_store_orders(store_id: str):
+    """Get all orders for a specific store"""
+    try:
+        # Get orders where any order item's store_item belongs to this store
+        orders = pb.collection('orders').get_list(
+            1, 50,  # Get up to 50 orders
+            query_params={
+                "expand": "order_items,order_items.store_item,order_items.store_item.store"
+            }
+        )
+
+        # Log the first order's fields for debugging
+        if orders.items:
+            first_order = orders.items[0]
+            logger.info("Example order fields:")
+            logger.info(f"Order raw data: {first_order.__dict__}")
+            logger.info(f"Available fields: {dir(first_order)}")
+
+        # Format orders for response
+        formatted_orders = []
+        for order in orders.items:
+            # Group items by store
+            stores_dict = {}
+            for item in order.expand.get('order_items', []):
+                if not item.expand.get('store_item'):
+                    continue
+
+                store_item = item.expand['store_item']
+                store = store_item.expand.get('store')
+                if not store or store.id != store_id:
+                    continue
+
+                store_id_key = store.id
+                if store_id_key not in stores_dict:
+                    stores_dict[store_id_key] = {
+                        'store': {
+                            'id': store.id,
+                            'name': store.name
+                        },
+                        'items': []
+                    }
+
+                stores_dict[store_id_key]['items'].append({
+                    'id': item.id,
+                    'name': store_item.name,
+                    'quantity': item.quantity,
+                    'price': item.price_at_time
+                })
+
+            # Only include orders that have items from this store
+            if stores_dict:
+                formatted_order = {
+                    'id': order.id,
+                    'created': order.created,
+                    'status': order.status,
+                    'delivery_fee': order.delivery_fee,
+                    'total_amount': order.total_amount,
+                    'stores': list(stores_dict.values())
+                }
+                formatted_orders.append(formatted_order)
+
+        return formatted_orders
+
+    except Exception as e:
+        logger.error(f"Error fetching store orders: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch store orders: {str(e)}"
+        )
+
+@app.patch("/api/v0/orders/{order_id}/status", response_model=Dict)
+async def update_order_status(order_id: str, request: Request):
+    """Update the status of an order"""
+    logger.info(f"Updating order {order_id}")
+    
+    # Get the request body
+    try:
+        body = await request.json()
+        logger.info(f"Request body: {body}")
+        status = body.get('status')
+        logger.info(f"Status from body: {status}")
+    except Exception as e:
+        logger.error(f"Error parsing request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    if not status:
+        logger.error("No status provided in request body")
+        raise HTTPException(status_code=400, detail="Status is required")
+
+    valid_statuses = ['pending', 'confirmed', 'picked_up', 'delivered', 'cancelled']
+    
+    if status not in valid_statuses:
+        logger.error(f"Invalid status: {status}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+        )
+
+    try:
+        # Update the order in PocketBase
+        data = {
+            'status': status,
+            'updated': datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+        
+        logger.info(f"Updating order {order_id} with data: {data}")
+        try:
+            order = pb.collection('orders').update(order_id, data)
+            logger.info(f"Order updated successfully: {order.id}")
+        except Exception as pb_error:
+            # Try to get more details from the error response
+            error_details = str(pb_error)
+            if hasattr(pb_error, 'response'):
+                try:
+                    error_json = pb_error.response.json()
+                    logger.error(f"PocketBase error response: {error_json}")
+                except:
+                    logger.error(f"Could not parse PocketBase error response. Raw response: {pb_error.response.text}")
+            raise pb_error
+
+        return {
+            'order_id': order.id,
+            'status': status,
+            'message': 'Order status updated successfully'
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating order status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update order status: {str(e)}"
         )
 
 @app.get("/api/v0/orders", response_model=List[Dict])
@@ -348,33 +395,53 @@ async def get_user_orders(request: Request):
         query_params={
             "filter": f'user = "{user_id}"',
             "sort": "-created",
-            "expand": "store,order_items"
+            "expand": "order_items(order).store_item,order_items(order).store_item.store"
         }
     )
 
     # Format orders for response
     formatted_orders = []
     for order in orders.items:
+        # Group items by store
+        stores_dict = {}
+
+        # Get all order items for this order
+        order_items = order.expand.get('order_items(order)', [])
+
+        for item in order_items:
+            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                continue
+
+            store_item = item.expand['store_item']
+            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                continue
+
+            store = store_item.expand['store']
+            store_id = store.id
+
+            if store_id not in stores_dict:
+                stores_dict[store_id] = {
+                    'store': {
+                        'id': store.id,
+                        'name': store.name
+                    },
+                    'items': []
+                }
+
+            stores_dict[store_id]['items'].append({
+                'id': item.id,
+                'name': store_item.name,
+                'quantity': item.quantity,
+                'price': item.price_at_time
+            })
+
         formatted_order = {
             'id': order.id,
             'created': order.created,
             'status': order.status,
             'delivery_fee': order.delivery_fee,
             'total_amount': order.total_amount,
-            'uber_tracking_url': order.uber_tracking_url,
-            'store': {
-                'id': order.expand.store.id,
-                'name': order.expand.store.name
-            } if order.expand.get('store') else None,
-            'items': [
-                {
-                    'id': item.id,
-                    'name': item.name,
-                    'quantity': item.quantity,
-                    'price': item.price_at_time
-                }
-                for item in order.expand.get('order_items', [])
-            ]
+            'stores': list(stores_dict.values())
         }
         formatted_orders.append(formatted_order)
 

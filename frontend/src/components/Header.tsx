@@ -52,14 +52,22 @@ export default function Header() {
             <span className="text-2xl font-bold font-display text-white">localmart</span>
           </Link>
           {user && (
-            <a
-              href="http://localhost:8090/_/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-white/80 hover:text-white transition-colors ml-2"
-            >
-              admin
-            </a>
+            <>
+              <a
+                href="http://localhost:8090/_/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-white/80 hover:text-white transition-colors ml-2"
+              >
+                database
+              </a>
+              <Link
+                href="/orders"
+                className="text-sm text-white/80 hover:text-white transition-colors ml-2"
+              >
+                orders
+              </Link>
+            </>
           )}
         </div>
         <div className="flex items-center gap-4">
