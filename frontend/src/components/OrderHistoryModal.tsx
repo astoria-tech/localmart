@@ -4,6 +4,18 @@ import { Dialog, Transition } from '@headlessui/react'
 import { Fragment } from 'react'
 import { formatCurrency } from '@/utils/currency'
 
+const formatDateTime = (isoString: string) => {
+  // Parse the UTC time string and create a Date object
+  const utcDate = new Date(isoString + 'Z'); // Ensure UTC interpretation by appending Z
+  
+  // Format in local timezone
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(utcDate);
+};
+
 interface OrderHistoryModalProps {
   isOpen: boolean
   onClose: () => void
@@ -72,8 +84,7 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
                         <div>
                           <p className="font-medium">Order #{order.id}</p>
                           <p className="text-sm text-gray-500">
-                            {new Date(order.created).toLocaleDateString()} at{' '}
-                            {new Date(order.created).toLocaleTimeString()}
+                            {formatDateTime(order.created)}
                           </p>
                         </div>
                         <span

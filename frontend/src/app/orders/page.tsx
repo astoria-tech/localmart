@@ -57,7 +57,7 @@ const statusLabels = {
 const formatDateTime = (isoString: string) => {
   // Parse the UTC time string and create a Date object
   const utcDate = new Date(isoString + 'Z'); // Ensure UTC interpretation by appending Z
-
+  
   // Format in local timezone
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',

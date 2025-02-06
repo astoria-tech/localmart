@@ -3,7 +3,7 @@
 import { useAuth } from '../app/contexts/auth'
 import { useCart } from '../app/contexts/cart'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import OrderHistoryModal from './OrderHistoryModal'
 import CartModal from './CartModal'
 import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
@@ -14,6 +14,34 @@ export default function Header() {
   const [showOrderHistory, setShowOrderHistory] = useState(false)
   const [showCart, setShowCart] = useState(false)
   const [orders, setOrders] = useState([])
+  const [firstName, setFirstName] = useState('')
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.token) return;
+
+      try {
+        const response = await fetch(`http://localhost:8000/api/v0/auth/profile`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+
+        const data = await response.json();
+        console.log('Profile data:', data); // Debug log
+        setFirstName(data.first_name || 'there');
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        setFirstName('there'); // Fallback
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   const handleShowOrderHistory = async () => {
     if (user) {
@@ -78,7 +106,7 @@ export default function Header() {
                   href="/profile"
                   className="text-sm text-white/80 hover:text-white transition-colors"
                 >
-                  Profile
+                  Hi, {firstName || 'there'}!
                 </Link>
                 <button
                   onClick={handleShowOrderHistory}

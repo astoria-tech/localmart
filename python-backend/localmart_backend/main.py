@@ -74,7 +74,8 @@ class UserSignup(BaseModel):
     email: str
     password: str
     passwordConfirm: str
-    name: str
+    first_name: str
+    last_name: str
 
 class DeliveryQuoteRequest(BaseModel):
     store_id: str
@@ -312,7 +313,7 @@ async def get_user_orders(request: Request):
 
             # Get user info from expanded user record
             user = order.expand.get('user', {})
-            customer_name = user.name if user else "Unknown"
+            customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
             
             # Format user's address
             delivery_address = {
@@ -391,7 +392,8 @@ async def signup(user: UserSignup):
             'email': user.email,
             'password': user.password,
             'passwordConfirm': user.passwordConfirm,
-            'name': user.name,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
             'username': user.email,  # Use email as username since PocketBase requires it
         })
 
@@ -407,7 +409,8 @@ async def signup(user: UserSignup):
             "user": {
                 "id": auth_data.record.id,
                 "email": auth_data.record.email,
-                "name": auth_data.record.name,
+                "first_name": auth_data.record.first_name,
+                "last_name": auth_data.record.last_name,
             }
         }
     except Exception as e:
@@ -432,7 +435,8 @@ async def login(user: UserLogin):
             "user": {
                 "id": auth_data.record.id,
                 "email": auth_data.record.email,
-                "name": auth_data.record.name,
+                "first_name": auth_data.record.first_name,
+                "last_name": auth_data.record.last_name,
             }
         }
     except Exception as e:
@@ -453,7 +457,8 @@ async def get_profile(request: Request):
         try:
             user = pb_service.get_one('users', user_id)
             return {
-                'name': user.name,
+                'first_name': getattr(user, 'first_name', ''),
+                'last_name': getattr(user, 'last_name', ''),
                 'email': user.email,
                 'street_1': getattr(user, 'street_1', ''),
                 'street_2': getattr(user, 'street_2', ''),
@@ -483,7 +488,8 @@ async def update_profile(request: Request):
     with user_auth_context(token):
         try:
             user = pb_service.update('users', user_id, {
-                'name': body.get('name'),
+                'first_name': body.get('first_name'),
+                'last_name': body.get('last_name'),
                 'street_1': body.get('street_1'),
                 'street_2': body.get('street_2'),
                 'city': body.get('city'),
@@ -492,7 +498,8 @@ async def update_profile(request: Request):
             })
             
             return {
-                'name': user.name,
+                'first_name': getattr(user, 'first_name', ''),
+                'last_name': getattr(user, 'last_name', ''),
                 'email': user.email,
                 'street_1': getattr(user, 'street_1', ''),
                 'street_2': getattr(user, 'street_2', ''),

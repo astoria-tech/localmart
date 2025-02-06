@@ -7,7 +7,6 @@ import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
 import Link from 'next/link';
-import { ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
 
 interface Store {
@@ -119,30 +118,8 @@ export default function StoreContent({ storeId }: { storeId: string }) {
               <div>
                 <h1 className="text-2xl font-bold text-[#2D3748]">{store.name}</h1>
                 <p className="text-[#4A5568] text-sm">Local market & grocery</p>
-              </div>
-
-              {/* Store Info */}
-              <div className="flex flex-col md:flex-row gap-6 md:items-center mt-4 md:mt-0">
-                {/* Hours */}
-                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
-                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
-                  <div>
-                    <p>Mon-Fri 8am-9pm</p>
-                    <p>Sat-Sun 9am-8pm</p>
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
-                  <MapPinIcon className="w-4 h-4 flex-shrink-0" />
-                  <div>
-                    <p>{store.street_1}</p>
-                    <p>{store.city}, {store.state} {store.zip_code}</p>
-                  </div>
-                </div>
-
                 {/* Social Links */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 mt-3">
                   <a
                     href="https://instagram.com/kinshipcoffee"
                     target="_blank"
@@ -180,15 +157,27 @@ export default function StoreContent({ storeId }: { storeId: string }) {
                     <SiBluesky className="w-5 h-5" />
                   </a>
                 </div>
+              </div>
 
-                {/* Orders Dashboard Link */}
-                <Link
-                  href={`/store/${store.id}/orders`}
-                  className="flex items-center gap-2 bg-white/10 backdrop-blur-sm text-[#2A9D8F] px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
-                >
-                  <ClipboardDocumentListIcon className="w-5 h-5" />
-                  <span>Orders Dashboard</span>
-                </Link>
+              {/* Store Info */}
+              <div className="flex flex-col md:flex-row gap-6 md:items-center mt-4 md:mt-0">
+                {/* Hours */}
+                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
+                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p>Mon-Fri 8am-9pm</p>
+                    <p>Sat-Sun 9am-8pm</p>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
+                  <MapPinIcon className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p>{store.street_1}</p>
+                    <p>{store.city}, {store.state} {store.zip_code}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
