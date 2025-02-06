@@ -17,7 +17,6 @@ defmodule SearchWeb.Router do
   scope "/", SearchWeb do
     pipe_through :browser
 
-    # get "/", PageController, :home
     live "/", SearchLive
   end
 
@@ -28,11 +27,6 @@ defmodule SearchWeb.Router do
     get "/search", SearchController, :search
     get "/hydrate", SearchController, :hydrate
   end
-
-  # Other scopes may use custom stacks.
-  # scope "/api", SearchWeb do
-  #   pipe_through :api
-  # end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:search, :dev_routes) do
