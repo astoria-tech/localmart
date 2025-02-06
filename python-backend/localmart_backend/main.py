@@ -238,76 +238,94 @@ async def create_order(request: Dict):
             detail=f"Failed to create order: {str(e)}"
         )
 
-@app.get("/api/v0/orders/store/{store_id}", response_model=List[Dict])
-async def get_store_orders(store_id: str):
-    """Get all orders for a specific store"""
-    try:
-        # Get orders where any order item's store_item belongs to this store
-        orders = pb.collection('orders').get_list(
-            1, 50,  # Get up to 50 orders
-            query_params={
-                "expand": "order_items,order_items.store_item,order_items.store_item.store"
-            }
-        )
+@app.get("/api/v0/orders", response_model=List[Dict])
+async def get_user_orders(request: Request):
+    """Get orders for the authenticated user"""
+    # Get auth token from header
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
 
-        # Log the first order's fields for debugging
-        if orders.items:
-            first_order = orders.items[0]
-            logger.info("Example order fields:")
-            logger.info(f"Order raw data: {first_order.__dict__}")
-            logger.info(f"Available fields: {dir(first_order)}")
+    token = auth_header.split(' ')[1]
+    logger.info(f"Received token in orders endpoint: {token[:20]}...")  # Log first 20 chars of token
 
-        # Format orders for response
-        formatted_orders = []
-        for order in orders.items:
-            # Group items by store
-            stores_dict = {}
-            for item in order.expand.get('order_items', []):
-                if not item.expand.get('store_item'):
-                    continue
+    decoded_token = decode_jwt(token)
+    print("Decoded token payload:", json.dumps(decoded_token, indent=2))
 
-                store_item = item.expand['store_item']
-                store = store_item.expand.get('store')
-                if not store or store.id != store_id:
-                    continue
+    user_id = decoded_token['id']
 
-                store_id_key = store.id
-                if store_id_key not in stores_dict:
-                    stores_dict[store_id_key] = {
-                        'store': {
-                            'id': store.id,
-                            'name': store.name
-                        },
-                        'items': []
-                    }
+    # Get user's orders
+    orders = pb.collection('orders').get_list(
+        1, 50,  # Get up to 50 orders
+        query_params={
+            "filter": f'user = "{user_id}"',
+            "sort": "-created",
+            "expand": "order_items(order).store_item,order_items(order).store_item.store,user"
+        }
+    )
 
-                stores_dict[store_id_key]['items'].append({
-                    'id': item.id,
-                    'name': store_item.name,
-                    'quantity': item.quantity,
-                    'price': item.price_at_time
-                })
+    # Format orders for response
+    formatted_orders = []
+    for order in orders.items:
+        # Group items by store
+        stores_dict = {}
 
-            # Only include orders that have items from this store
-            if stores_dict:
-                formatted_order = {
-                    'id': order.id,
-                    'created': order.created,
-                    'status': order.status,
-                    'delivery_fee': order.delivery_fee,
-                    'total_amount': order.total_amount,
-                    'stores': list(stores_dict.values())
+        # Get all order items for this order
+        order_items = order.expand.get('order_items(order)', [])
+
+        for item in order_items:
+            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                continue
+
+            store_item = item.expand['store_item']
+            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                continue
+
+            store = store_item.expand['store']
+            store_id = store.id
+
+            if store_id not in stores_dict:
+                stores_dict[store_id] = {
+                    'store': {
+                        'id': store.id,
+                        'name': store.name
+                    },
+                    'items': []
                 }
-                formatted_orders.append(formatted_order)
 
-        return formatted_orders
+            stores_dict[store_id]['items'].append({
+                'id': item.id,
+                'name': store_item.name,
+                'quantity': item.quantity,
+                'price': item.price_at_time
+            })
 
-    except Exception as e:
-        logger.error(f"Error fetching store orders: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch store orders: {str(e)}"
-        )
+        # Get user info from expanded user record
+        user = order.expand.get('user', {})
+        customer_name = user.name if user else "Unknown"
+        
+        # Format user's address
+        delivery_address = {
+            'street_address': [user.street_1] + ([user.street_2] if user.street_2 else []),
+            'city': user.city,
+            'state': user.state,
+            'zip_code': user.zip,
+            'country': 'US'
+        } if user else None
+
+        formatted_order = {
+            'id': order.id,
+            'created': order.created,
+            'status': order.status,
+            'delivery_fee': order.delivery_fee,
+            'total_amount': order.total_amount,
+            'customer_name': customer_name,
+            'delivery_address': delivery_address,
+            'stores': list(stores_dict.values())
+        }
+        formatted_orders.append(formatted_order)
+
+    return formatted_orders
 
 @app.patch("/api/v0/orders/{order_id}/status", response_model=Dict)
 async def update_order_status(order_id: str, request: Request):
@@ -371,81 +389,6 @@ async def update_order_status(order_id: str, request: Request):
             status_code=500,
             detail=f"Failed to update order status: {str(e)}"
         )
-
-@app.get("/api/v0/orders", response_model=List[Dict])
-async def get_user_orders(request: Request):
-    """Get orders for the authenticated user"""
-    # Get auth token from header
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-
-    token = auth_header.split(' ')[1]
-    logger.info(f"Received token in orders endpoint: {token[:20]}...")  # Log first 20 chars of token
-
-    decoded_token = decode_jwt(token)
-    print("Decoded token payload:", json.dumps(decoded_token, indent=2))
-
-    # FIXME: Multiple sessions need to be tested, this may just be using the last logged in user
-    user_id = decoded_token['id']
-
-    # Get user's orders
-    orders = pb.collection('orders').get_list(
-        1, 50,  # Get up to 50 orders
-        query_params={
-            "filter": f'user = "{user_id}"',
-            "sort": "-created",
-            "expand": "order_items(order).store_item,order_items(order).store_item.store"
-        }
-    )
-
-    # Format orders for response
-    formatted_orders = []
-    for order in orders.items:
-        # Group items by store
-        stores_dict = {}
-
-        # Get all order items for this order
-        order_items = order.expand.get('order_items(order)', [])
-
-        for item in order_items:
-            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
-                continue
-
-            store_item = item.expand['store_item']
-            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
-                continue
-
-            store = store_item.expand['store']
-            store_id = store.id
-
-            if store_id not in stores_dict:
-                stores_dict[store_id] = {
-                    'store': {
-                        'id': store.id,
-                        'name': store.name
-                    },
-                    'items': []
-                }
-
-            stores_dict[store_id]['items'].append({
-                'id': item.id,
-                'name': store_item.name,
-                'quantity': item.quantity,
-                'price': item.price_at_time
-            })
-
-        formatted_order = {
-            'id': order.id,
-            'created': order.created,
-            'status': order.status,
-            'delivery_fee': order.delivery_fee,
-            'total_amount': order.total_amount,
-            'stores': list(stores_dict.values())
-        }
-        formatted_orders.append(formatted_order)
-
-    return formatted_orders
 
 ### AUTH ROUTES
 

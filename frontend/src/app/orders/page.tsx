@@ -21,6 +21,14 @@ interface Order {
   status: string;
   delivery_fee: number;
   total_amount: number;
+  customer_name: string;
+  delivery_address: {
+    street_address: string[];
+    city: string;
+    state: string;
+    zip_code: string;
+    country: string;
+  } | null;
   stores: Array<{
     store: {
       id: string;
@@ -156,6 +164,12 @@ export default function OrdersDashboard() {
                   Date
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
+                  Customer
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
+                  Delivery Address
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
                   Status
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
@@ -174,6 +188,23 @@ export default function OrdersDashboard() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
                     {new Date(order.created).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                    {order.customer_name}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[#4A5568]">
+                    {order.delivery_address ? (
+                      <>
+                        <div>
+                          {order.delivery_address.street_address.filter(Boolean).join(', ')}
+                        </div>
+                        <div>
+                          {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-gray-400 italic">No address available</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
