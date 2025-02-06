@@ -54,6 +54,18 @@ const statusLabels = {
   cancelled: 'Cancelled',
 };
 
+const formatDateTime = (isoString: string) => {
+  // Parse the UTC time string and create a Date object
+  const utcDate = new Date(isoString + 'Z'); // Ensure UTC interpretation by appending Z
+
+  // Format in local timezone
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(utcDate);
+};
+
 export default function OrdersDashboard() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -161,7 +173,7 @@ export default function OrdersDashboard() {
                   Order ID
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
-                  Date
+                  Date & Time
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
                   Customer
@@ -187,7 +199,7 @@ export default function OrdersDashboard() {
                     #{order.id.slice(-6)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                    {new Date(order.created).toLocaleString()}
+                    {formatDateTime(order.created)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
                     {order.customer_name}
