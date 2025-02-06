@@ -22,12 +22,9 @@ defmodule Search.Meili do
   end
 
   def hydrate do
-    data_path = Path.join(:code.priv_dir(:search), "../data/movies.json")
-
-    with {:ok, content} <- File.read(data_path),
-         {:ok, movies} <- Jason.decode(content),
-         {:ok, _} <- create_search_index("movies"),
-         {:ok, task} <- add_documents_to_search_index("movies", movies) do
+    with products = Search.Inventory.Generator.products(:list, 1000),
+         {:ok, _} <- create_search_index("products"),
+         {:ok, task} <- add_documents_to_search_index("products", products) do
       {:ok, task}
     else
       {:error, reason} -> {:error, reason}
