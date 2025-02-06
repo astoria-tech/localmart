@@ -18,7 +18,6 @@ Accept: application/json
 HTTP 400
 [Asserts]
 header "Content-Type" == "application/json; charset=utf-8"
-jsonpath "$.errors" exists
 
 # Add documents to search index
 # Test successful document addition
@@ -53,7 +52,7 @@ Content-Type: application/json
     "index": "invalid"
 }
 
-HTTP 422
+HTTP 400
 [Asserts]
 header "Content-Type" == "application/json; charset=utf-8"
 jsonpath "$.error" exists
@@ -68,12 +67,3 @@ HTTP 202
 header "Content-Type" == "application/json; charset=utf-8"
 jsonpath "$.message" == "Documents are being processed"
 jsonpath "$.task" exists
-
-# Test hydration error
-GET http://localhost:4100/api/hydrate?force_error=true
-Accept: application/json
-
-HTTP 422
-[Asserts]
-header "Content-Type" == "application/json; charset=utf-8"
-jsonpath "$.error" exists

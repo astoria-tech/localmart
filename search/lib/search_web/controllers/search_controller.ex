@@ -3,6 +3,8 @@ defmodule SearchWeb.SearchController do
 
   alias Search.Meili
 
+  action_fallback SearchWeb.FallbackController
+
   def search(conn, %{"query" => query, "index" => index} = _params) do
     case Meili.search_document(index, query, 0) do
       {:ok, results} ->
@@ -17,6 +19,10 @@ defmodule SearchWeb.SearchController do
     end
   end
 
+  def search(_conn, _params) do
+    {:error, :missing_parameters}
+  end
+
   def create(conn, %{"documents" => documents, "index" => index}) do
     case Meili.add_documents_to_search_index(index, documents) do
       {:ok, task} ->
@@ -29,6 +35,10 @@ defmodule SearchWeb.SearchController do
         |> put_status(:unprocessable_entity)
         |> json(%{error: error})
     end
+  end
+
+  def create(_conn, _params) do
+    {:error, :missing_parameters}
   end
 
   def hydrate(conn, _params) do
@@ -51,6 +61,15 @@ defimpl Jason.Encoder, for: Meilisearch.Search do
     value
     |> Map.from_struct()
     |> Map.take([:hits, :processingTimeMs])
+    |> Jason.Encode.map(opts)
+  end
+end
+
+defimpl Jason.Encoder, for: Meilisearch.SummarizedTask do
+  def encode(value, opts) do
+    value
+    |> Map.from_struct()
+    |> Map.take([:taskUid, :indexUid, :status, :type, :enqueuedAt])
     |> Jason.Encode.map(opts)
   end
 end
