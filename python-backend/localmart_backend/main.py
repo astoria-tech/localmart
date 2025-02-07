@@ -5,20 +5,21 @@ import json
 import logging
 import os
 from typing import List, Dict, Set
+from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pocketbase import PocketBase
 from pydantic import BaseModel
 
 from .uber_direct import UberDirectClient
+from .pocketbase_service import PocketBaseService
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize PocketBase client
-pb = PocketBase('http://pocketbase:8090')
+# Initialize PocketBase service
+pb_service = PocketBaseService('http://pocketbase:8090')
 
 # Get Uber Direct credentials from environment
 UBER_CUSTOMER_ID = os.getenv('LOCALMART_UBER_DIRECT_CUSTOMER_ID')
@@ -30,6 +31,22 @@ uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SEC
 
 # Track active deliveries
 active_deliveries: Set[str] = set()
+
+@contextmanager
+def user_auth_context(token: str):
+    """Context manager to handle user authentication state"""
+    try:
+        pb_service.set_token(token)
+        yield
+    finally:
+        pb_service.clear_token()
+
+def get_token_from_request(request: Request) -> str:
+    """Extract and validate the auth token from a request"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    return auth_header.split(' ')[1]
 
 def decode_jwt(token):
     # Split the token into parts
@@ -49,38 +66,6 @@ def decode_jwt(token):
     except Exception as e:
         return f"Error decoding token: {str(e)}"
 
-async def poll_delivery_status(delivery_id: str, order_id: str):
-    """Poll Uber Direct API for delivery status updates"""
-    try:
-        while delivery_id in active_deliveries:
-            delivery_data = await uber_client.get_delivery_status(delivery_id)
-            status = delivery_data['status']
-
-            # Update order status in PocketBase
-            pb.collection('orders').update(order_id, {
-                'status': status
-            })
-
-            # Create status update record
-            pb.collection('order_status_updates').create({
-                'order': order_id,
-                'status': status,
-                'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                'details': delivery_data
-            })
-
-            # Remove from active deliveries if in terminal state
-            if status in ['delivered', 'cancelled']:
-                active_deliveries.remove(delivery_id)
-                logger.info(f"Delivery {delivery_id} completed with status: {status}")
-                break
-
-            # Poll every 30 seconds
-            await asyncio.sleep(30)
-    except Exception as e:
-        logger.error(f"Error polling delivery {delivery_id}: {str(e)}")
-        active_deliveries.remove(delivery_id)
-
 class UserLogin(BaseModel):
     email: str
     password: str
@@ -89,11 +74,12 @@ class UserSignup(BaseModel):
     email: str
     password: str
     passwordConfirm: str
-    name: str
+    first_name: str
+    last_name: str
 
 class DeliveryQuoteRequest(BaseModel):
     store_id: str
-    item_id: str  # Add item_id to get the price
+    item_id: str
     delivery_address: Dict
 
 app = FastAPI(
@@ -135,7 +121,7 @@ async def list_stores():
     """List all stores"""
     try:
         # Get all records from the stores collection
-        stores = pb.collection('stores').get_list(1, 50)
+        stores = pb_service.get_list('stores', 1, 50)
 
         # Convert Record objects to simplified dictionaries
         return [serialize_store(store) for store in stores.items]
@@ -150,7 +136,7 @@ async def get_store(store_id: str):
     """Get a single store by ID"""
     try:
         # Get the store record
-        store = pb.collection('stores').get_one(store_id)
+        store = pb_service.get_one('stores', store_id)
         return serialize_store(store)
     except Exception as e:
         raise HTTPException(
@@ -163,7 +149,8 @@ async def list_store_items(store_id: str):
     """List all items for a specific store"""
     try:
         # Get all records from the store_items collection for this store
-        items = pb.collection('store_items').get_list(
+        items = pb_service.get_list(
+            'store_items',
             1, 50,
             query_params={
                 "filter": f'store = "{store_id}"'
@@ -183,10 +170,10 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
     """Get a delivery quote from Uber Direct"""
     try:
         # Get store details
-        store = pb.collection('stores').get_one(request.store_id)
+        store = pb_service.get_one('stores', request.store_id)
 
         # Get item details
-        item = pb.collection('store_items').get_one(request.item_id)
+        item = pb_service.get_one('store_items', request.item_id)
         item_price_cents = int(item.price * 100)  # Convert to cents
 
         # Prepare addresses
@@ -230,32 +217,26 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
         )
 
 @app.post("/api/v0/orders", response_model=Dict)
-async def create_order(
-    background_tasks: BackgroundTasks,
-    request: Dict
-):
-    """Create a new order and initiate Uber delivery"""
+async def create_order(request: Dict):
+    """Create a new order with basic status tracking"""
     try:
-        # First create the order in PocketBase
-        order = pb.collection('orders').create({
+        # Create the order in PocketBase with simplified fields
+        order = pb_service.create('orders', {
             'user': request['user_id'],
             'store': request['store_id'],
-            'status': 'pending',
-            'delivery_address': request['delivery_address'],
+            'status': 'pending',  # Initial status
             'subtotal_amount': request['subtotal_amount'],
             'tax_amount': request['tax_amount'],
             'delivery_fee': request['delivery_fee'],
             'total_amount': request['total_amount'],
-            'estimated_delivery_time': request['estimated_delivery_time'],
-            'pickup_ready_time': request['pickup_ready_time'],
-            'pickup_deadline_time': request['pickup_deadline_time'],
-            'dropoff_ready_time': request['dropoff_ready_time'],
-            'dropoff_deadline_time': request['dropoff_deadline_time']
+            'delivery_address': request['delivery_address'],
+            'customer_notes': request.get('customer_notes', ''),
+            'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         })
 
         # Create order items
         for item in request['items']:
-            pb.collection('order_items').create({
+            pb_service.create('order_items', {
                 'order': order.id,
                 'store_item': item['store_item_id'],
                 'quantity': item['quantity'],
@@ -263,59 +244,10 @@ async def create_order(
                 'total_price': item['price'] * item['quantity']
             })
 
-        # Get store details
-        store = pb.collection('stores').get_one(request['store_id'])
-
-        # Prepare pickup address
-        pickup_address = {
-            'street_address': [store.street_1],
-            'city': store.city,
-            'state': store.state,
-            'zip_code': store.zip,
-            'country': 'US'
-        }
-
-        # Prepare manifest items
-        manifest_items = [
-            {
-                'name': item['name'],
-                'quantity': item['quantity'],
-                'price': int(item['price'] * 100)
-            }
-            for item in request['items']
-        ]
-
-        # Create delivery in Uber Direct
-        delivery_data = await uber_client.create_delivery(
-            pickup_address=pickup_address,
-            dropoff_address=request['delivery_address'],
-            pickup_ready=request['pickup_ready_time'],
-            pickup_deadline=request['pickup_deadline_time'],
-            dropoff_ready=request['dropoff_ready_time'],
-            dropoff_deadline=request['dropoff_deadline_time'],
-            total_amount=request['total_amount'],
-            manifest_items=manifest_items
-        )
-
-        # Update order with Uber delivery details
-        pb.collection('orders').update(order.id, {
-            'uber_delivery_id': delivery_data['id'],
-            'uber_tracking_url': delivery_data['tracking_url'],
-            'status': 'confirmed'
-        })
-
-        # Start polling for updates
-        active_deliveries.add(delivery_data['id'])
-        background_tasks.add_task(
-            poll_delivery_status,
-            delivery_data['id'],
-            order.id
-        )
-
         return {
             'order_id': order.id,
-            'uber_delivery_id': delivery_data['id'],
-            'tracking_url': delivery_data['tracking_url']
+            'status': 'pending',
+            'message': 'Order created successfully'
         }
 
     except Exception as e:
@@ -328,57 +260,128 @@ async def create_order(
 @app.get("/api/v0/orders", response_model=List[Dict])
 async def get_user_orders(request: Request):
     """Get orders for the authenticated user"""
-    # Get auth token from header
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-
-    token = auth_header.split(' ')[1]
-    logger.info(f"Received token in orders endpoint: {token[:20]}...")  # Log first 20 chars of token
-
+    token = get_token_from_request(request)
     decoded_token = decode_jwt(token)
-    print("Decoded token payload:", json.dumps(decoded_token, indent=2))
-
-    # FIXME: Multiple sessions need to be tested, this may just be using the last logged in user
     user_id = decoded_token['id']
 
-    # Get user's orders
-    orders = pb.collection('orders').get_list(
-        1, 50,  # Get up to 50 orders
-        query_params={
-            "filter": f'user = "{user_id}"',
-            "sort": "-created",
-            "expand": "store,order_items"
-        }
-    )
+    with user_auth_context(token):
+        # Get user's orders
+        orders = pb_service.get_list(
+            'orders',
+            query_params={
+                "filter": f'user = "{user_id}"',
+                "sort": "-created",
+                "expand": "order_items(order).store_item,order_items(order).store_item.store,user"
+            }
+        )
 
-    # Format orders for response
-    formatted_orders = []
-    for order in orders.items:
-        formatted_order = {
-            'id': order.id,
-            'created': order.created,
-            'status': order.status,
-            'delivery_fee': order.delivery_fee,
-            'total_amount': order.total_amount,
-            'uber_tracking_url': order.uber_tracking_url,
-            'store': {
-                'id': order.expand.store.id,
-                'name': order.expand.store.name
-            } if order.expand.get('store') else None,
-            'items': [
-                {
+        # Format orders for response
+        formatted_orders = []
+        for order in orders.items:
+            # Group items by store
+            stores_dict = {}
+
+            # Get all order items for this order
+            order_items = order.expand.get('order_items(order)', [])
+
+            for item in order_items:
+                if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                    continue
+
+                store_item = item.expand['store_item']
+                if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                    continue
+
+                store = store_item.expand['store']
+                store_id = store.id
+
+                if store_id not in stores_dict:
+                    stores_dict[store_id] = {
+                        'store': {
+                            'id': store.id,
+                            'name': store.name
+                        },
+                        'items': []
+                    }
+
+                stores_dict[store_id]['items'].append({
                     'id': item.id,
-                    'name': item.name,
+                    'name': store_item.name,
                     'quantity': item.quantity,
                     'price': item.price_at_time
-                }
-                for item in order.expand.get('order_items', [])
-            ]
-        }
-        formatted_orders.append(formatted_order)
+                })
 
-    return formatted_orders
+            # Get user info from expanded user record
+            user = order.expand.get('user', {})
+            customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
+            
+            # Format user's address
+            delivery_address = {
+                'street_address': [user.street_1] + ([user.street_2] if user.street_2 else []),
+                'city': user.city,
+                'state': user.state,
+                'zip_code': user.zip,
+                'country': 'US'
+            } if user else None
+
+            formatted_order = {
+                'id': order.id,
+                'created': order.created,
+                'status': order.status,
+                'delivery_fee': order.delivery_fee,
+                'total_amount': order.total_amount,
+                'tax_amount': order.tax_amount,
+                'customer_name': customer_name,
+                'customer_phone': getattr(user, 'phone_number', None),
+                'delivery_address': delivery_address,
+                'stores': list(stores_dict.values())
+            }
+            formatted_orders.append(formatted_order)
+
+        return formatted_orders
+
+@app.patch("/api/v0/orders/{order_id}/status", response_model=Dict)
+async def update_order_status(order_id: str, request: Request):
+    """Update the status of an order"""
+    token = get_token_from_request(request)
+    
+    try:
+        body = await request.json()
+        status = body.get('status')
+    except Exception as e:
+        logger.error(f"Error parsing request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    if not status:
+        raise HTTPException(status_code=400, detail="Status is required")
+
+    valid_statuses = ['pending', 'confirmed', 'picked_up', 'delivered', 'cancelled']
+    if status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+        )
+
+    with user_auth_context(token):
+        try:
+            data = {
+                'status': status,
+                'updated': datetime.datetime.now(datetime.timezone.utc).isoformat()
+            }
+            
+            order = pb_service.update('orders', order_id, data)
+            
+            return {
+                'order_id': order.id,
+                'status': status,
+                'message': 'Order status updated successfully'
+            }
+        except Exception as e:
+            logger.error(f"Error updating order status: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update order status: {str(e)}"
+            )
 
 ### AUTH ROUTES
 
@@ -387,16 +390,18 @@ async def signup(user: UserSignup):
     """Create a new user account"""
     try:
         # Create user record
-        record = pb.collection('users').create({
+        record = pb_service.create('users', {
             'email': user.email,
             'password': user.password,
             'passwordConfirm': user.passwordConfirm,
-            'name': user.name,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
             'username': user.email,  # Use email as username since PocketBase requires it
         })
 
         # After creation, authenticate to get the token
-        auth_data = pb.collection('users').auth_with_password(
+        auth_data = pb_service.auth_with_password(
+            'users',
             user.email,
             user.password
         )
@@ -406,7 +411,8 @@ async def signup(user: UserSignup):
             "user": {
                 "id": auth_data.record.id,
                 "email": auth_data.record.email,
-                "name": auth_data.record.name,
+                "first_name": auth_data.record.first_name,
+                "last_name": auth_data.record.last_name,
             }
         }
     except Exception as e:
@@ -420,28 +426,98 @@ async def signup(user: UserSignup):
 async def login(user: UserLogin):
     """Log in an existing user"""
     try:
-        auth_data = pb.collection('users').auth_with_password(
+        auth_data = pb_service.auth_with_password(
+            'users',
             user.email,
             user.password
         )
-        logger.info(f"Login successful. Token type: {type(auth_data.token)}")
-        logger.info(f"Token: {auth_data.token[:20]}...")  # Log first 20 chars of token
 
-        response_data = {
+        return {
             "token": auth_data.token,
             "user": {
                 "id": auth_data.record.id,
                 "email": auth_data.record.email,
-                "name": auth_data.record.name,
+                "first_name": auth_data.record.first_name,
+                "last_name": auth_data.record.last_name,
             }
         }
-        return response_data
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
+
+@app.get("/api/v0/auth/profile", response_model=Dict)
+async def get_profile(request: Request):
+    """Get the current user's profile"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    with user_auth_context(token):
+        try:
+            user = pb_service.get_one('users', user_id)
+            return {
+                'first_name': getattr(user, 'first_name', ''),
+                'last_name': getattr(user, 'last_name', ''),
+                'email': user.email,
+                'phone_number': getattr(user, 'phone_number', ''),
+                'street_1': getattr(user, 'street_1', ''),
+                'street_2': getattr(user, 'street_2', ''),
+                'city': getattr(user, 'city', ''),
+                'state': getattr(user, 'state', ''),
+                'zip': getattr(user, 'zip', '')
+            }
+        except Exception as e:
+            logger.error(f"Error fetching user profile: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch user profile: {str(e)}"
+            )
+
+@app.patch("/api/v0/auth/profile", response_model=Dict)
+async def update_profile(request: Request):
+    """Update the current user's profile"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    with user_auth_context(token):
+        try:
+            user = pb_service.update('users', user_id, {
+                'first_name': body.get('first_name'),
+                'last_name': body.get('last_name'),
+                'phone_number': body.get('phone_number'),
+                'street_1': body.get('street_1'),
+                'street_2': body.get('street_2'),
+                'city': body.get('city'),
+                'state': body.get('state'),
+                'zip': body.get('zip')
+            })
+            
+            return {
+                'first_name': getattr(user, 'first_name', ''),
+                'last_name': getattr(user, 'last_name', ''),
+                'email': user.email,
+                'phone_number': getattr(user, 'phone_number', ''),
+                'street_1': getattr(user, 'street_1', ''),
+                'street_2': getattr(user, 'street_2', ''),
+                'city': getattr(user, 'city', ''),
+                'state': getattr(user, 'state', ''),
+                'zip': getattr(user, 'zip', '')
+            }
+        except Exception as e:
+            logger.error(f"Error updating user profile: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update user profile: {str(e)}"
+            )
 
 ### UTILS
 

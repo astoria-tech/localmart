@@ -6,6 +6,8 @@ import { useCart } from '../../contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
+import Link from 'next/link';
+import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
 
 interface Store {
   id: string;
@@ -108,52 +110,75 @@ export default function StoreContent({ storeId }: { storeId: string }) {
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
       <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-[#2D3748] mb-4">{store.name}</h1>
-            <p className="text-lg text-[#4A5568] mb-4">
-              {store.street_1}
-              {store.street_2 && `, ${store.street_2}`}
-              <br />
-              {store.city}, {store.state} {store.zip_code}
-            </p>
-            <div className="flex justify-center gap-6 mt-4">
-              <a
-                href="https://instagram.com/kinshipcoffee"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
-                aria-label="Instagram"
-              >
-                <FaInstagram className="w-7 h-7" />
-              </a>
-              <a
-                href="https://facebook.com/kinshipcoffee"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
-                aria-label="Facebook"
-              >
-                <FaFacebook className="w-7 h-7" />
-              </a>
-              <a
-                href="https://x.com/kinshipcoffee"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
-                aria-label="X (formerly Twitter)"
-              >
-                <FaXTwitter className="w-7 h-7" />
-              </a>
-              <a
-                href="https://bsky.app/profile/kinshipcoffee.bsky.social"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
-                aria-label="Bluesky Social"
-              >
-                <SiBluesky className="w-7 h-7" />
-              </a>
+        <div className="h-32 bg-gradient-to-r from-[#2A9D8F]/10 to-[#2A9D8F]/5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-5"></div>
+          <div className="container mx-auto px-4 h-full">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between h-full py-6">
+              {/* Store Name and Type */}
+              <div>
+                <h1 className="text-2xl font-bold text-[#2D3748]">{store.name}</h1>
+                <p className="text-[#4A5568] text-sm">Local market & grocery</p>
+                {/* Social Links */}
+                <div className="flex gap-3 mt-3">
+                  <a
+                    href="https://instagram.com/kinshipcoffee"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    aria-label="Instagram"
+                  >
+                    <FaInstagram className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="https://facebook.com/kinshipcoffee"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    aria-label="Facebook"
+                  >
+                    <FaFacebook className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="https://x.com/kinshipcoffee"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    aria-label="X (formerly Twitter)"
+                  >
+                    <FaXTwitter className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="https://bsky.app/profile/kinshipcoffee.bsky.social"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    aria-label="Bluesky Social"
+                  >
+                    <SiBluesky className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Store Info */}
+              <div className="flex flex-col md:flex-row gap-6 md:items-center mt-4 md:mt-0">
+                {/* Hours */}
+                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
+                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p>Mon-Fri 8am-9pm</p>
+                    <p>Sat-Sun 9am-8pm</p>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
+                  <MapPinIcon className="w-4 h-4 flex-shrink-0" />
+                  <div>
+                    <p>{store.street_1}</p>
+                    <p>{store.city}, {store.state} {store.zip_code}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
