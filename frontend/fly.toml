@@ -7,6 +7,8 @@ primary_region = "ewr" # Change this to your preferred region
 [env]
   NODE_ENV = "production"
   PORT = "3000"
+  NEXT_PUBLIC_API_URL = "https://localmart-backend.fly.dev"
+  NEXT_PUBLIC_POCKETBASE_URL = "https://localmart-pocketbase.fly.dev"
 
 [http_service]
   internal_port = 3000

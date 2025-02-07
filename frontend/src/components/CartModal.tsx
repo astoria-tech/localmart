@@ -6,6 +6,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCart } from '@/app/contexts/cart';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
+import { config } from '@/config';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
     const fetchStore = async () => {
       if (items.length > 0) {
         try {
-          const response = await fetch(`http://localhost:8000/api/v0/stores/${items[0].store}`);
+          const response = await fetch(`${config.apiUrl}/api/v0/stores/${items[0].store}`);
           if (!response.ok) {
             console.error(`Failed to fetch store: ${response.status} ${response.statusText}`);
             const errorData = await response.json().catch(() => ({}));
@@ -92,7 +93,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       };
 
       // Create the order
-      const response = await fetch('http://localhost:8000/api/v0/orders', {
+      const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

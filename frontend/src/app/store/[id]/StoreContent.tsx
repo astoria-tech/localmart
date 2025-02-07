@@ -8,6 +8,7 @@ import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
 import Link from 'next/link';
 import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { config } from '@/config';
 
 interface Store {
   id: string;
@@ -45,7 +46,7 @@ export default function StoreContent({ storeId }: { storeId: string }) {
     const fetchStoreAndItems = async () => {
       try {
         // Fetch store details
-        const storeResponse = await fetch(`http://localhost:8000/api/v0/stores/${storeId}`);
+        const storeResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}`);
         if (!storeResponse.ok) {
           throw new Error('Failed to fetch store');
         }
@@ -53,7 +54,7 @@ export default function StoreContent({ storeId }: { storeId: string }) {
         setStore(storeData);
 
         // Fetch store items
-        const itemsResponse = await fetch(`http://localhost:8000/api/v0/stores/${storeId}/items`);
+        const itemsResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items`);
         if (!itemsResponse.ok) {
           throw new Error('Failed to fetch store items');
         }

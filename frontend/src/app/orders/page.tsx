@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
+import { config } from '@/config';
 
 interface OrderItem {
   id: string;
@@ -76,7 +77,7 @@ export default function OrdersDashboard() {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v0/orders', {
+        const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
           headers: {
             'Authorization': `Bearer ${user?.token}`,
           },
@@ -102,7 +103,7 @@ export default function OrdersDashboard() {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v0/orders/${orderId}/status`, {
+      const response = await fetch(`${config.apiUrl}/api/v0/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${user?.token}`,

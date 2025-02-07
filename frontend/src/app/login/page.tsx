@@ -7,13 +7,14 @@ import Link from 'next/link';
 import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
+  const { login, signup } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, signup } = useAuth();
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -29,7 +30,7 @@ export default function LoginPage() {
 
     try {
       if (isSignup) {
-        await signup(email, password, name);
+        await signup(email, password, `${firstName} ${lastName}`);
       } else {
         await login(email, password);
       }
@@ -42,8 +43,8 @@ export default function LoginPage() {
   };
 
   const toggleMode = () => {
-    setIsSignup(!isSignup);
     setError('');
+    setIsSignup(!isSignup);
     // Update URL without refreshing the page
     const newUrl = !isSignup ? '/login?signup=true' : '/login';
     window.history.pushState({}, '', newUrl);
@@ -65,34 +66,51 @@ export default function LoginPage() {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-4">
               {isSignup && (
-                <div>
-                  <label htmlFor="name" className="sr-only">
-                    Name
-                  </label>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    required={isSignup}
-                    className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
-                    placeholder="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="firstName" className="sr-only">
+                      First Name
+                    </label>
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
+                      placeholder="First Name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lastName" className="sr-only">
+                      Last Name
+                    </label>
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
+                      placeholder="Last Name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
               <div>
-                <label htmlFor="email-address" className="sr-only">
-                  Email address
+                <label htmlFor="email" className="sr-only">
+                  Email
                 </label>
                 <input
-                  id="email-address"
+                  id="email"
                   name="email"
                   type="email"
                   autoComplete="email"
                   required
                   className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
-                  placeholder="Email address"
+                  placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -105,7 +123,7 @@ export default function LoginPage() {
                   id="password"
                   name="password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete={isSignup ? 'new-password' : 'current-password'}
                   required
                   className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
                   placeholder="Password"

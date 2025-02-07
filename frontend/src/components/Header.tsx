@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import OrderHistoryModal from './OrderHistoryModal'
 import CartModal from './CartModal'
 import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
+import { config } from '@/config'
 
 export default function Header() {
   const { user, logout } = useAuth()
@@ -21,7 +22,7 @@ export default function Header() {
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`http://localhost:8000/api/v0/auth/profile`, {
+        const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
           headers: {
             'Authorization': `Bearer ${user.token}`
           }
@@ -48,7 +49,7 @@ export default function Header() {
       try {
         console.log('User token:', user.token?.slice(0, 20) + '...')  // Log first 20 chars of token
         
-        const response = await fetch('http://localhost:8000/api/v0/orders', {
+        const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
           headers: {
             'Authorization': `Bearer ${user.token}`,
             'Content-Type': 'application/json'
@@ -82,7 +83,7 @@ export default function Header() {
           {user && (
             <>
               <a
-                href="http://localhost:8090/_/"
+                href={`${config.pocketbaseUrl}/_/`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-white/80 hover:text-white transition-colors ml-2"
