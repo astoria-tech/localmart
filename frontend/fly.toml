@@ -2,7 +2,7 @@ app = "localmart-frontend"
 primary_region = "ewr" # Change this to your preferred region
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "Dockerfile.prod"
 
 [env]
   NODE_ENV = "production"

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, signup } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -168,5 +168,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB]">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-[#2A9D8F]"></div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 } 
