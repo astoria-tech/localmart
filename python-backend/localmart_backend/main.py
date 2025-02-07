@@ -18,8 +18,9 @@ from .pocketbase_service import PocketBaseService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize PocketBase service
-pb_service = PocketBaseService('http://pocketbase:8090')
+# Initialize PocketBase service with environment variable or default
+POCKETBASE_URL = os.getenv('POCKETBASE_URL', 'http://pocketbase:8090')
+pb_service = PocketBaseService(POCKETBASE_URL)
 
 # Get Uber Direct credentials from environment
 UBER_CUSTOMER_ID = os.getenv('LOCALMART_UBER_DIRECT_CUSTOMER_ID')

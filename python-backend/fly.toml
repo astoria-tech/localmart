@@ -7,6 +7,7 @@ primary_region = "ewr" # Change this to your preferred region
 [env]
   PORT = "8000"
   PYTHONPATH = "/app"
+  POCKETBASE_URL = "https://localmart-pocketbase.fly.dev"
 
 [http_service]
   internal_port = 8000
