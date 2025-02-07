@@ -57,7 +57,7 @@ defmodule Search.Inventory.Generator do
       description:
         "#{attribute} #{bean_type} coffee from #{origin}, #{roast} roast. #{processing} processed and available in #{packaging}.",
       tags: generate_tags(bean_type),
-      imageUrl: "/api/placeholder/300/300",
+      imageUrl: "https://picsum.photos/seed/coffee/100",
       quantity: random_int(10, 500),
       price: random_price(coffee_data.price_range.min, coffee_data.price_range.max),
       rating: random_rating(),
