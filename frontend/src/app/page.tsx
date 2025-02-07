@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from './contexts/auth';
 import Link from 'next/link';
 import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
-import { SearchProvider } from './contexts/search';
-import { SearchBar } from '../components/SearchBar';
+import { SearchProvider } from '@/app/contexts/search';
+import { Search } from '@/components/Search';
 
 interface Store {
   id: string;
@@ -87,7 +86,7 @@ export default function Page() {
               Shop from your favorite local stores with same-day delivery
             </p>
             <div className="mt-8">
-              <SearchBar />
+              <Search />
             </div>
           </div>
         </div>
