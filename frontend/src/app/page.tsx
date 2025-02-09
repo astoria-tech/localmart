@@ -21,7 +21,7 @@ export default function Page() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const productSearchEnabled = useFeatureFlag('product_search')
+  const productSearchEnabled = useFeatureFlag('product_search');
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -87,9 +87,7 @@ export default function Page() {
               Shop from your favorite local stores with same-day delivery
             </p>
             <SearchProvider>
-              <div className="mt-8">
                 { productSearchEnabled && <Search />}
-              </div>
             </SearchProvider>
           </div>
         </div>
