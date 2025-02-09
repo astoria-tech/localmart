@@ -3,6 +3,7 @@ import { Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from './contexts/auth';
 import { CartProvider } from './contexts/cart';
+import { FeatureFlagsProvider } from './contexts/featureFlags';
 import { Toaster } from 'react-hot-toast';
 import Header from '@/components/Header';
 
@@ -35,12 +36,14 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${dmSans.variable} font-sans antialiased`}
       >
-        <AuthProvider>
-          <CartProvider>
-            <Header />
-            {children}
-          </CartProvider>
-        </AuthProvider>
+        <FeatureFlagsProvider>
+          <AuthProvider>
+            <CartProvider>
+              <Header />
+              {children}
+            </CartProvider>
+          </AuthProvider>
+        </FeatureFlagsProvider>
         <Toaster position="bottom-right" />
       </body>
     </html>
