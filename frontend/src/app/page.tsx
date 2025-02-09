@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 import { SearchProvider } from '@/app/contexts/search';
 import { Search } from '@/components/Search';
+import { useFeatureFlag } from '@/app/contexts/featureFlags';
 
 interface Store {
   id: string;
@@ -20,6 +21,7 @@ export default function Page() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const productSearchEnabled = useFeatureFlag('product_search')
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -72,8 +74,7 @@ export default function Page() {
   }
 
   return (
-    <SearchProvider>
-      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
+    <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
       <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
         <div className="container mx-auto px-4 py-12">
@@ -85,9 +86,11 @@ export default function Page() {
             <p className="text-lg text-[#4A5568]">
               Shop from your favorite local stores with same-day delivery
             </p>
-            <div className="mt-8">
-              <Search />
-            </div>
+            <SearchProvider>
+              <div className="mt-8">
+                { productSearchEnabled && <Search />}
+              </div>
+            </SearchProvider>
           </div>
         </div>
       </div>
@@ -124,6 +127,5 @@ export default function Page() {
         </div>
       </div>
     </main>
-    </SearchProvider>
   );
 }
