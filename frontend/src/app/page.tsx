@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from './contexts/auth';
 import Link from 'next/link';
 import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
+import { SearchProvider } from '@/app/contexts/search';
+import { Search } from '@/components/Search';
+import { useFeatureFlag } from '@/app/contexts/featureFlags';
 
 interface Store {
   id: string;
@@ -19,6 +21,7 @@ export default function Page() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const productSearchEnabled = useFeatureFlag('product_search');
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -83,6 +86,9 @@ export default function Page() {
             <p className="text-lg text-[#4A5568]">
               Shop from your favorite local stores with same-day delivery
             </p>
+            <SearchProvider>
+                { productSearchEnabled && <Search />}
+            </SearchProvider>
           </div>
         </div>
       </div>

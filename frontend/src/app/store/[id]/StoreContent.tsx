@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/auth';
 import { useCart } from '../../contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
-import Link from 'next/link';
 import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { config } from '@/config';
 
@@ -40,7 +38,6 @@ export default function StoreContent({ storeId }: { storeId: string }) {
 
   // Check if cart has items from a different store
   const hasItemsFromDifferentStore = cartItems.length > 0 && cartItems[0].store !== storeId;
-  const currentCartStoreName = hasItemsFromDifferentStore ? store?.name : null;
 
   useEffect(() => {
     const fetchStoreAndItems = async () => {
@@ -59,13 +56,11 @@ export default function StoreContent({ storeId }: { storeId: string }) {
           throw new Error('Failed to fetch store items');
         }
         const itemsData = await itemsResponse.json();
-        
         // Add mock image URLs to items
         const itemsWithImages = itemsData.map((item: StoreItem) => ({
           ...item,
           imageUrl: `https://picsum.photos/seed/${item.id}/400/300`
         }));
-        
         setItems(itemsWithImages);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch store data');
@@ -222,4 +217,4 @@ export default function StoreContent({ storeId }: { storeId: string }) {
       </div>
     </main>
   );
-} 
+}
