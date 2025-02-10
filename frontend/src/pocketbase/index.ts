@@ -1,5 +1,6 @@
 import PocketBase from 'pocketbase';
+import { config } from '@/config';
 
-const pb = new PocketBase('http://localhost:8090');
+const pb = new PocketBase(config.pocketbaseUrl);
 
 export default pb;
