@@ -45,6 +45,10 @@ services:
       - "7700:7700"
     volumes:
       - ./volumes/meilisearch_data:/data.ms
+    environment:
+      - MEILI_ENV=production
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-iyTjmntitsWVfallAEBbMyssNNRc-1TOFYW3wzI2r0}
     restart: unless-stopped
 
   search:
@@ -56,11 +60,12 @@ services:
       - PHX_HOST=localhost
       - MIX_ENV=prod
       - SECRET_KEY_BASE=1OhQxOL5gxafD09z/Eb0VNFw+qGInscrD2+oWgfXMsuYEafVFz/Jo+r+Vq4G3cOb
-      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_ENDPOINT=http://meilisearch:7700
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-iyTjmntitsWVfallAEBbMyssNNRc-1TOFYW3wzI2r0}
     ports:
       - "4100:4100"
     depends_on:
       - meilisearch
 
 volumes:
-  pocketbase_data: 
+  pocketbase_data:

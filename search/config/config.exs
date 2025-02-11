@@ -60,7 +60,9 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-config :search, :meilisearch, host: System.get_env("MEILI_HOST", "http://localhost:7700")
+config :search, :meilisearch,
+  key: System.get_env("MEILI_MASTER_KEY", "iyTjmntitsWVfallAEBbMyssNNRc-1TOFYW3wzI2r0"),
+  endpoint: System.get_env("MEILI_ENDPOINT", "http://0.0.0.0:7700")
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

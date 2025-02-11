@@ -15,8 +15,8 @@ defmodule Search.Application do
       {Finch, name: Search.Finch},
       {Meilisearch,
        name: :public_search,
-       endpoint: Application.get_env(:search, :meilisearch)[:host],
-       key: "public_key",
+       endpoint: Application.get_env(:search, :meilisearch)[:endpoint],
+       key: Application.get_env(:search, :meilisearch)[:key],
        finch: Search.Finch},
       # Start our custom task
       Search.Task,
