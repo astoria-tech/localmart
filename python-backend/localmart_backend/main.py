@@ -230,18 +230,45 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
 async def create_order(request: Dict):
     """Create a new order with basic status tracking"""
     try:
+        # Get the payment method
+        payment_method = pb_service.get_one('payment_methods', request['payment_method_id'])
+        if not payment_method:
+            raise HTTPException(status_code=400, detail="Invalid payment method")
+
+        # Get the customer
+        customers = pb_service.get_list(
+            'stripe_customers',
+            query_params={"filter": f'user = "{request["user_id"]}"'}
+        )
+        if not customers.items:
+            raise HTTPException(status_code=400, detail="No Stripe customer found")
+        
+        stripe_customer_id = customers.items[0].stripe_customer_id
+
+        # Create a payment intent
+        payment_intent = stripe.PaymentIntent.create(
+            amount=int(request['total_amount'] * 100),  # Convert to cents
+            currency='usd',
+            customer=stripe_customer_id,
+            payment_method=payment_method.stripe_payment_method_id,
+            off_session=True,
+            confirm=True,
+        )
+
         # Create the order in PocketBase with simplified fields
         order = pb_service.create('orders', {
             'user': request['user_id'],
             'store': request['store_id'],
             'status': 'pending',  # Initial status
+            'payment_status': 'pending',  # Initial payment status
+            'payment_method': payment_method.id,  # Link to payment method
+            'stripe_payment_intent_id': payment_intent.id,
             'subtotal_amount': request['subtotal_amount'],
             'tax_amount': request['tax_amount'],
             'delivery_fee': request['delivery_fee'],
             'total_amount': request['total_amount'],
             'delivery_address': request['delivery_address'],
             'customer_notes': request.get('customer_notes', ''),
-            'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         })
 
         # Create order items
@@ -257,9 +284,13 @@ async def create_order(request: Dict):
         return {
             'order_id': order.id,
             'status': 'pending',
+            'payment_intent_client_secret': payment_intent.client_secret,
             'message': 'Order created successfully'
         }
 
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating order: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating order: {str(e)}")
         raise HTTPException(
