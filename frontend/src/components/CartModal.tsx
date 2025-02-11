@@ -18,11 +18,22 @@ interface Store {
   name: string;
 }
 
+interface SavedCard {
+  id: string;
+  last4: string;
+  brand: string;
+  exp_month: number;
+  exp_year: number;
+  isDefault: boolean;
+}
+
 export default function CartModal({ isOpen, onClose }: CartModalProps) {
   const { items, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
   const [store, setStore] = useState<Store | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string>('');
 
   // Fetch store details when items change
   useEffect(() => {
@@ -49,6 +60,49 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
     fetchStore();
   }, [items]);
 
+  // Fetch saved cards when modal opens
+  useEffect(() => {
+    const fetchCards = async () => {
+      if (!user?.token) return;
+
+      try {
+        const response = await fetch(`${config.apiUrl}/api/v0/payment/cards`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+
+        if (response.status === 404) {
+          // No cards found is a valid state
+          setSavedCards([]);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch cards');
+        }
+
+        const cards = await response.json();
+        setSavedCards(Array.isArray(cards) ? cards : []);
+        // Set the default card if available
+        const defaultCard = cards.find((card: SavedCard) => card.isDefault);
+        if (defaultCard) {
+          setSelectedCardId(defaultCard.id);
+        } else if (cards.length > 0) {
+          setSelectedCardId(cards[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching cards:', error);
+        // Don't show error toast for no cards
+        setSavedCards([]);
+      }
+    };
+
+    if (isOpen && user) {
+      fetchCards();
+    }
+  }, [isOpen, user]);
+
   const handleCheckout = async () => {
     if (!user) {
       toast.error('Please log in to checkout');
@@ -57,6 +111,11 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
 
     if (!store) {
       toast.error('Store information not found');
+      return;
+    }
+
+    if (!selectedCardId) {
+      toast.error('Please select a payment method');
       return;
     }
 
@@ -83,6 +142,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
         tax_amount: taxAmount,
         delivery_fee: deliveryFee,
         total_amount: totalAmount,
+        payment_method_id: selectedCardId,
         delivery_address: {
           street_address: ["123 Main St"], // TODO: Get from user input
           city: "New York",
@@ -224,6 +284,35 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                     </div>
 
                     <div className="border-t border-[#2A9D8F]/10 bg-white/50 backdrop-blur-sm px-4 py-6 sm:px-6">
+                      {/* Payment Method Selection */}
+                      {savedCards.length > 0 && (
+                        <div className="mb-4">
+                          <label htmlFor="payment-method" className="block text-sm font-medium text-[#2D3748] mb-2">
+                            Payment Method
+                          </label>
+                          <select
+                            id="payment-method"
+                            value={selectedCardId}
+                            onChange={(e) => setSelectedCardId(e.target.value)}
+                            className="w-full rounded-lg border border-[#2A9D8F]/20 bg-white py-2 px-3 shadow-sm focus:border-[#2A9D8F] focus:outline-none focus:ring-1 focus:ring-[#2A9D8F]"
+                          >
+                            {savedCards.map((card) => (
+                              <option key={card.id} value={card.id}>
+                                {card.brand.charAt(0).toUpperCase() + card.brand.slice(1)} •••• {card.last4}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {savedCards.length === 0 && (
+                        <div className="mb-4 p-4 bg-yellow-50 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            Please add a payment method in your profile before checking out.
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex justify-between text-lg font-medium text-[#2D3748]">
                         <p>Subtotal</p>
                         <p>${totalPrice.toFixed(2)}</p>
@@ -234,14 +323,10 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                       <div className="mt-6">
                         <button
                           onClick={handleCheckout}
-                          disabled={isCheckingOut || items.length === 0}
+                          disabled={isCheckingOut || items.length === 0 || savedCards.length === 0}
                           className="w-full flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isCheckingOut ? (
-                            'Processing...'
-                          ) : (
-                            'Checkout'
-                          )}
+                          {isCheckingOut ? 'Processing...' : 'Checkout'}
                         </button>
                       </div>
                     </div>

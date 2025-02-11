@@ -4,12 +4,14 @@ import datetime
 import json
 import logging
 import os
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Optional
 from contextlib import contextmanager
 
-from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import stripe
+from pocketbase import Client
 
 from .uber_direct import UberDirectClient
 from .pocketbase_service import PocketBaseService
@@ -33,6 +35,9 @@ uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SEC
 
 # Track active deliveries
 active_deliveries: Set[str] = set()
+
+# Initialize Stripe
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 @contextmanager
 def user_auth_context(token: str):
@@ -550,3 +555,134 @@ def serialize_store_item(item) -> Dict:
         "name": item.name,
         "price": item.price
     }
+
+@app.post("/api/v0/payment/setup-intent")
+async def create_setup_intent(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No authorization token")
+
+    try:
+        # Verify the user's token
+        token = authorization.split(' ')[1] if authorization.startswith('Bearer ') else authorization
+        user = pb_service.get_user_from_token(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Create a SetupIntent
+        setup_intent = stripe.SetupIntent.create(
+            payment_method_types=['card'],
+            usage='off_session',  # Allow using this payment method for future payments
+        )
+
+        return {"clientSecret": setup_intent.client_secret}
+
+    except Exception as e:
+        print(f"Error creating setup intent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create setup intent")
+
+@app.post("/api/v0/payment/cards")
+async def save_payment_method(payment_data: dict, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No authorization token")
+
+    try:
+        # Verify the user's token
+        token = authorization.split(' ')[1] if authorization.startswith('Bearer ') else authorization
+        user = pb_service.get_user_from_token(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        payment_method_id = payment_data.get('payment_method_id')
+        if not payment_method_id:
+            raise HTTPException(status_code=400, detail="Payment method ID is required")
+
+        # Get payment method details from Stripe
+        payment_method = stripe.PaymentMethod.retrieve(payment_method_id)
+
+        # Create a record in PocketBase
+        card_data = {
+            "user": user.id,
+            "stripe_payment_method_id": payment_method_id,
+            "last4": payment_method.card.last4,
+            "brand": payment_method.card.brand,
+            "exp_month": payment_method.card.exp_month,
+            "exp_year": payment_method.card.exp_year,
+            "is_default": True  # First card added will be default
+        }
+
+        # If this is the default card, update other cards to not be default
+        if card_data["is_default"]:
+            existing_cards = pb_service.pb.collection('payment_methods').get_list(
+                1, 50, 
+                {"filter": f'user = "{user.id}" && is_default = true'}
+            )
+            for card in existing_cards.items:
+                pb_service.pb.collection('payment_methods').update(card.id, {"is_default": False})
+
+        # Save the card to PocketBase
+        pb_service.pb.collection('payment_methods').create(card_data)
+
+        return {"status": "success"}
+
+    except stripe.error.StripeError as e:
+        print(f"Stripe error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error saving payment method: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save payment method")
+
+@app.get("/api/v0/payment/cards")
+async def get_payment_methods(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No authorization token")
+
+    try:
+        # Verify the user's token
+        token = authorization.split(' ')[1] if authorization.startswith('Bearer ') else authorization
+        user = pb_service.get_user_from_token(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Get cards from PocketBase
+        cards = pb_service.pb.collection('payment_methods').get_list(
+            1, 50,
+            {"filter": f'user = "{user.id}"'}
+        )
+
+        return cards.items
+
+    except Exception as e:
+        print(f"Error fetching payment methods: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch payment methods")
+
+@app.delete("/api/v0/payment/cards/{card_id}")
+async def delete_payment_method(card_id: str, authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No authorization token")
+
+    try:
+        # Verify the user's token
+        token = authorization.split(' ')[1] if authorization.startswith('Bearer ') else authorization
+        user = pb_service.get_user_from_token(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Get the card from PocketBase
+        card = pb_service.pb.collection('payment_methods').get_one(card_id)
+        if not card or card.user != user.id:
+            raise HTTPException(status_code=404, detail="Card not found")
+
+        # Delete the payment method from Stripe
+        stripe.PaymentMethod.detach(card.stripe_payment_method_id)
+
+        # Delete the card from PocketBase
+        pb_service.pb.collection('payment_methods').delete(card_id)
+
+        return {"status": "success"}
+
+    except stripe.error.StripeError as e:
+        print(f"Stripe error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error deleting payment method: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete payment method")

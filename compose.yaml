@@ -10,6 +10,7 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - NEXT_PUBLIC_STRIPE_KEY=${NEXT_PUBLIC_STRIPE_KEY}
     depends_on:
       - backend
 
@@ -21,6 +22,7 @@ services:
       - LOCALMART_UBER_DIRECT_CUSTOMER_ID=${LOCALMART_UBER_DIRECT_CUSTOMER_ID}
       - LOCALMART_UBER_DIRECT_CLIENT_ID=${LOCALMART_UBER_DIRECT_CLIENT_ID}
       - LOCALMART_UBER_DIRECT_CLIENT_SECRET=${LOCALMART_UBER_DIRECT_CLIENT_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - PYTHONPATH=/app
     ports:
       - "8000:8000"

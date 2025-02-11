@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
 import { config } from '@/config';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_KEY!);
 
 interface UserProfile {
   first_name: string;
@@ -16,10 +21,117 @@ interface UserProfile {
   zip: string;
 }
 
+interface SavedCard {
+  id: string;
+  last4: string;
+  brand: string;
+  exp_month: number;
+  exp_year: number;
+  isDefault: boolean;
+}
+
+// Card form component
+function CardForm({ onSuccess }: { onSuccess: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements || !user?.token) return;
+
+    setLoading(true);
+    try {
+      // Get setup intent from backend
+      const setupResponse = await fetch(`${config.apiUrl}/api/v0/payment/setup-intent`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+        }
+      });
+
+      if (!setupResponse.ok) {
+        throw new Error('Failed to create setup intent');
+      }
+
+      const { clientSecret } = await setupResponse.json();
+
+      // Confirm card setup
+      const result = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement)!,
+          billing_details: {
+            name: user.name,
+          },
+        },
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      // Notify backend of successful setup
+      const attachResponse = await fetch(`${config.apiUrl}/api/v0/payment/cards`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payment_method_id: result.setupIntent!.payment_method,
+        }),
+      });
+
+      if (!attachResponse.ok) {
+        throw new Error('Failed to save card');
+      }
+
+      toast.success('Card added successfully');
+      onSuccess();
+    } catch (error) {
+      console.error('Error adding card:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add card');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-4 bg-white rounded-lg border border-[#2A9D8F]/20">
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#2D3748',
+                '::placeholder': {
+                  color: '#A0AEC0',
+                },
+              },
+            },
+          }}
+        />
+      </div>
+      <button
+        onClick={handleSubmit}
+        type="button"
+        disabled={!stripe || loading}
+        className="w-full flex items-center justify-center rounded-md border border-[#2A9D8F] bg-white px-4 py-2 text-sm font-medium text-[#2A9D8F] shadow-sm hover:bg-[#2A9D8F] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        {loading ? 'Adding Card...' : 'Add Card'}
+      </button>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [profile, setProfile] = useState<UserProfile>({
     first_name: '',
     last_name: '',
@@ -87,6 +199,42 @@ export default function ProfilePage() {
     fetchProfile();
   }, [user]);
 
+  const fetchCards = async () => {
+    if (!user?.token) return;
+
+    try {
+      const response = await fetch(`${config.apiUrl}/api/v0/payment/cards`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+
+      if (response.status === 404) {
+        // No cards is a valid state
+        setSavedCards([]);
+        return;
+      }
+
+      if (!response.ok) {
+        console.error('Error fetching cards:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+        throw new Error('Failed to fetch cards');
+      }
+
+      const data = await response.json();
+      setSavedCards(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching cards:', error);
+      // Don't show error toast for no cards
+      setSavedCards([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchCards();
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.token) return;
@@ -112,6 +260,29 @@ export default function ProfilePage() {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRemoveCard = async (cardId: string) => {
+    if (!user?.token) return;
+
+    try {
+      const response = await fetch(`${config.apiUrl}/api/v0/payment/cards/${cardId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove card');
+      }
+
+      toast.success('Card removed successfully');
+      setSavedCards(cards => cards.filter(card => card.id !== cardId));
+    } catch (error) {
+      console.error('Error removing card:', error);
+      toast.error('Failed to remove card');
     }
   };
 
@@ -298,6 +469,61 @@ export default function ProfilePage() {
               </button>
             </div>
           </form>
+
+          {/* Payment Methods Section - Outside the profile form */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm p-6 mt-8">
+            <h2 className="text-xl font-semibold text-[#2D3748] mb-6 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#2A9D8F]" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
+              </svg>
+              Payment Methods
+            </h2>
+
+            {/* Saved Cards */}
+            <div className="space-y-4 mb-6">
+              {savedCards.map((card) => (
+                <div key={card.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-[#2A9D8F]/20">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="text-[#2D3748] font-medium">
+                        {card.brand.charAt(0).toUpperCase() + card.brand.slice(1)} •••• {card.last4}
+                      </p>
+                      <p className="text-sm text-[#4A5568]">
+                        Expires {card.exp_month.toString().padStart(2, '0')}/{card.exp_year}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveCard(card.id)}
+                    className="text-sm text-red-600 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Card Section */}
+            {showCardForm ? (
+              <Elements stripe={stripePromise}>
+                <CardForm
+                  onSuccess={() => {
+                    setShowCardForm(false);
+                    fetchCards();
+                  }}
+                />
+              </Elements>
+            ) : (
+              <button
+                onClick={() => setShowCardForm(true)}
+                type="button"
+                className="w-full flex items-center justify-center rounded-md border border-[#2A9D8F] bg-white px-4 py-2 text-sm font-medium text-[#2A9D8F] shadow-sm hover:bg-[#2A9D8F] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Add New Card
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </main>
