@@ -1,0 +1,36 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches:
+    - azlyth/fly
+    #   - main
+
+jobs:
+  deploy:
+    name: Deploy apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Database
+        working-directory: db
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --remote-only 
+
+      - name: Deploy Backend
+        working-directory: python-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          flyctl deploy --remote-only
+
+      - name: Deploy Frontend
+        working-directory: frontend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --remote-only

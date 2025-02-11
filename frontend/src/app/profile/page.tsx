@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
+import { config } from '@/config';
 
 interface UserProfile {
   first_name: string;
@@ -54,7 +55,7 @@ export default function ProfilePage() {
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`http://localhost:8000/api/v0/auth/profile`, {
+        const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
           headers: {
             'Authorization': `Bearer ${user.token}`
           }
@@ -92,7 +93,7 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/v0/auth/profile`, {
+      const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${user.token}`,

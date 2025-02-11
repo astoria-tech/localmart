@@ -18,8 +18,10 @@ from .pocketbase_service import PocketBaseService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize PocketBase service
-pb_service = PocketBaseService('http://pocketbase:8090')
+# Initialize PocketBase service with environment variable or default
+POCKETBASE_URL = os.getenv('POCKETBASE_URL', 'http://pocketbase:8090')
+logger.info(f"Initializing PocketBase with URL: {POCKETBASE_URL}")
+pb_service = PocketBaseService(POCKETBASE_URL)
 
 # Get Uber Direct credentials from environment
 UBER_CUSTOMER_ID = os.getenv('LOCALMART_UBER_DIRECT_CUSTOMER_ID')
@@ -91,7 +93,10 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "https://localmart-frontend.fly.dev"  # Production
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -389,6 +394,7 @@ async def update_order_status(order_id: str, request: Request):
 async def signup(user: UserSignup):
     """Create a new user account"""
     try:
+        logger.info(f"Attempting to create user with email: {user.email}")
         # Create user record
         record = pb_service.create('users', {
             'email': user.email,
@@ -398,13 +404,16 @@ async def signup(user: UserSignup):
             'last_name': user.last_name,
             'username': user.email,  # Use email as username since PocketBase requires it
         })
+        logger.info("User record created successfully")
 
         # After creation, authenticate to get the token
+        logger.info("Attempting to authenticate new user")
         auth_data = pb_service.auth_with_password(
             'users',
             user.email,
             user.password
         )
+        logger.info("User authenticated successfully")
 
         return {
             "token": auth_data.token,
@@ -416,7 +425,8 @@ async def signup(user: UserSignup):
             }
         }
     except Exception as e:
-        print(f"Signup error: {str(e)}")  # Add debug logging
+        logger.error(f"Signup error: {str(e)}")
+        logger.error(f"Request data: {user}")
         raise HTTPException(
             status_code=400,
             detail=str(e)

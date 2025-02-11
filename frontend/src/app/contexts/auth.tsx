@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { config } from '@/config';
 
 interface User {
   id: string;
@@ -30,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch('http://localhost:8000/api/v0/auth/login', {
+    const response = await fetch(`${config.apiUrl}/api/v0/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userData = {
       id: data.user.id,
       email: data.user.email,
-      name: data.user.name,
+      name: `${data.user.first_name} ${data.user.last_name}`.trim(),
       token: data.token,
     };
 
@@ -55,7 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signup = async (email: string, password: string, name: string) => {
-    const response = await fetch('http://localhost:8000/api/v0/auth/signup', {
+    // Split name into first and last name
+    const [first_name, ...lastNameParts] = name.trim().split(' ');
+    const last_name = lastNameParts.join(' ') || ''; // Join remaining parts or empty string
+
+    const response = await fetch(`${config.apiUrl}/api/v0/auth/signup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -64,7 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         passwordConfirm: password,
-        name,
+        first_name,
+        last_name
       }),
     });
 
@@ -76,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userData = {
       id: data.user.id,
       email: data.user.email,
-      name: data.user.name,
+      name: `${data.user.first_name} ${data.user.last_name}`.trim(),
       token: data.token,
     };
 
