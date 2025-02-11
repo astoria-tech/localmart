@@ -20,6 +20,7 @@ interface Order {
   id: string;
   created: string;
   status: string;
+  payment_status: string;
   delivery_fee: number;
   total_amount: number;
   customer_name: string;
@@ -54,6 +55,22 @@ const statusLabels = {
   picked_up: 'Picked Up',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
+};
+
+const paymentStatusColors = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  processing: 'bg-blue-100 text-blue-800',
+  succeeded: 'bg-green-100 text-green-800',
+  failed: 'bg-red-100 text-red-800',
+  refunded: 'bg-gray-100 text-gray-800',
+};
+
+const paymentStatusLabels = {
+  pending: 'Pending',
+  processing: 'Processing',
+  succeeded: 'Succeeded',
+  failed: 'Failed',
+  refunded: 'Refunded',
 };
 
 const formatDateTime = (isoString: string) => {
@@ -190,6 +207,9 @@ export default function OrdersDashboard() {
                   Status
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
+                  Payment
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
                   Items
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
@@ -241,6 +261,11 @@ export default function OrdersDashboard() {
                         ))}
                       </select>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentStatusColors[order.payment_status as keyof typeof paymentStatusColors]}`}>
+                      {paymentStatusLabels[order.payment_status as keyof typeof paymentStatusLabels]}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-[#4A5568]">

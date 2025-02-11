@@ -369,6 +369,7 @@ async def get_user_orders(request: Request):
                 'id': order.id,
                 'created': order.created,
                 'status': order.status,
+                'payment_status': order.payment_status,
                 'delivery_fee': order.delivery_fee,
                 'total_amount': order.total_amount,
                 'tax_amount': order.tax_amount,
