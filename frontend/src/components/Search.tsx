@@ -3,20 +3,20 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearch } from "@/app/contexts/search";
 import { SearchItem } from "@/app/contexts/search";
+import { config } from "@/config";
 
 export function Search() {
   const { setSearchItems, setIsLoading, isLoading } = useSearch();
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-  const baseAPIUrl = "http://localhost:4100";
   const productIndex = "products";
 
   const handleSearch = async (searchQuery: string) => {
     try {
       setIsLoading(true);
       const response = await fetch(
-        `${baseAPIUrl}/api/search?query=${encodeURIComponent(
+        `${config.searchUrl}/api/search?query=${encodeURIComponent(
           searchQuery,
         )}&index=${productIndex}`,
       );

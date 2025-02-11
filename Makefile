@@ -1,5 +1,5 @@
 all: clean run
-deploy-all: deploy-frontend deploy-backend deploy-pocketbase
+deploy-all: deploy-frontend deploy-backend deploy-pocketbase deploy-meilisearch deploy-search
 
 run:
 	docker compose up --build
@@ -12,10 +12,16 @@ clean-data:
 	rm -rf ./volumes
 
 deploy-frontend:
-	fly deploy frontend
+	cd frontend && fly deploy
 
 deploy-backend:
-	fly deploy backend
+	cd python-backend && fly deploy
 
 deploy-pocketbase:
-	fly deploy pocketbase
+	cd db && fly deploy
+
+deploy-meilisearch:
+	cd search/meilisearch && fly deploy
+
+deploy-search:
+	cd search && fly deploy
