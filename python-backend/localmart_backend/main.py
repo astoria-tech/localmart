@@ -596,6 +596,35 @@ async def save_payment_method(payment_data: dict, authorization: str = Header(No
         if not payment_method_id:
             raise HTTPException(status_code=400, detail="Payment method ID is required")
 
+        # Get or create Stripe Customer
+        customers = pb_service.get_list(
+            'stripe_customers',
+            query_params={"filter": f'user = "{user.id}"'}
+        )
+        
+        if customers.items:
+            stripe_customer_id = customers.items[0].stripe_customer_id
+        else:
+            # Create new Stripe customer
+            stripe_customer = stripe.Customer.create(
+                email=user.email,
+                name=f"{user.first_name} {user.last_name}".strip(),
+                metadata={"user_id": user.id}
+            )
+            stripe_customer_id = stripe_customer.id
+            
+            # Save customer ID to PocketBase
+            pb_service.create('stripe_customers', {
+                "user": user.id,
+                "stripe_customer_id": stripe_customer_id
+            })
+
+        # Attach payment method to customer
+        stripe.PaymentMethod.attach(
+            payment_method_id,
+            customer=stripe_customer_id,
+        )
+
         # Get payment method details from Stripe
         payment_method = stripe.PaymentMethod.retrieve(payment_method_id)
 
