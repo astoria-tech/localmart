@@ -7,7 +7,7 @@ import os
 from typing import List, Dict, Set, Optional
 from contextlib import contextmanager
 
-from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request, Header
+from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import stripe
@@ -38,6 +38,9 @@ active_deliveries: Set[str] = set()
 
 # Initialize Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+# Initialize Stripe webhook secret
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 
 @contextmanager
 def user_auth_context(token: str):
@@ -747,3 +750,80 @@ async def delete_payment_method(card_id: str, authorization: str = Header(None))
     except Exception as e:
         print(f"Error deleting payment method: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete payment method")
+
+@app.post("/api/v0/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    # Get the webhook payload
+    payload = await request.body()
+    
+    # In development (when using stripe-cli), we skip signature verification
+    # In production, we verify the signature
+    if STRIPE_WEBHOOK_SECRET:
+        # Get the Stripe signature from headers
+        sig_header = request.headers.get('stripe-signature')
+        try:
+            # Verify the webhook signature
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, STRIPE_WEBHOOK_SECRET
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError as e:
+            raise HTTPException(status_code=400, detail="Invalid signature")
+    else:
+        # Development mode - parse the payload without verification
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    # Handle specific event types
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        # Update order payment status to succeeded
+        try:
+            logger.info(f"Processing payment_intent.succeeded for intent {payment_intent['id']}")
+            orders = pb_service.get_list(
+                'orders',
+                query_params={
+                    "filter": f'stripe_payment_intent_id = "{payment_intent["id"]}"'
+                }
+            )
+            if orders.items:
+                order = orders.items[0]
+                pb_service.update('orders', order.id, {
+                    'payment_status': 'succeeded'
+                })
+                logger.info(f"Updated order {order.id} payment status to succeeded")
+            else:
+                logger.warning(f"No order found for payment intent {payment_intent['id']}")
+        except Exception as e:
+            logger.error(f"Error updating order payment status: {str(e)}")
+            logger.error("Full payment intent object:")
+            logger.error(json.dumps(payment_intent, indent=2))
+
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        # Update order payment status to failed
+        try:
+            logger.info(f"Processing payment_intent.payment_failed for intent {payment_intent['id']}")
+            orders = pb_service.get_list(
+                'orders',
+                query_params={
+                    "filter": f'stripe_payment_intent_id = "{payment_intent["id"]}"'
+                }
+            )
+            if orders.items:
+                order = orders.items[0]
+                pb_service.update('orders', order.id, {
+                    'payment_status': 'failed'
+                })
+                logger.info(f"Updated order {order.id} payment status to failed")
+            else:
+                logger.warning(f"No order found for payment intent {payment_intent['id']}")
+        except Exception as e:
+            logger.error(f"Error updating order payment status: {str(e)}")
+            logger.error("Full payment intent object:")
+            logger.error(json.dumps(payment_intent, indent=2))
+
+    return {"status": "success"}

@@ -32,6 +32,15 @@ services:
     depends_on:
       - pocketbase
 
+  stripe-cli:
+    image: stripe/stripe-cli
+    container_name: stripe-cli
+    command: "listen --api-key ${STRIPE_SECRET_KEY} --forward-to backend:8000/api/v0/webhooks/stripe"
+    environment:
+      - STRIPE_API_KEY=${STRIPE_SECRET_KEY}
+    depends_on:
+      - backend
+
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest
     ports:
