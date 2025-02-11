@@ -19,6 +19,7 @@ primary_region = "ewr" # Change this to your preferred region
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 1
+  max_machines_count = 1
   processes = ["app"]
 
 [[vm]]
