@@ -50,6 +50,13 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: db
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Pocketbase URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
 
   deploy-backend:
     name: Deploy Backend
@@ -64,6 +71,13 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: python-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Backend URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
 
   deploy-meilisearch:
     # only deploy on staging for now
@@ -80,6 +94,13 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: meilisearch
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Meilisearch URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
 
   deploy-search:
     # only deploy on staging for now
@@ -96,6 +117,13 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: search
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Search URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
 
   deploy-frontend:
     name: Deploy Frontend
@@ -110,3 +138,10 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: frontend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Frontend URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
