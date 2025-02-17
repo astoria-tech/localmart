@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '../app/contexts/auth'
+import { useAuth, useIsAdmin } from '../app/contexts/auth'
 import { useCart } from '../app/contexts/cart'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
@@ -11,6 +11,7 @@ import { config } from '@/config'
 
 export default function Header() {
   const { user, logout } = useAuth()
+  const isAdmin = useIsAdmin()
   const { totalItems } = useCart()
   const [showOrderHistory, setShowOrderHistory] = useState(false)
   const [showCart, setShowCart] = useState(false)
@@ -82,20 +83,24 @@ export default function Header() {
           </Link>
           {user && (
             <>
-              <a
-                href={`${config.pocketbaseUrl}/_/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white/80 hover:text-white transition-colors ml-2"
-              >
-                database
-              </a>
-              <Link
-                href="/orders"
-                className="text-sm text-white/80 hover:text-white transition-colors ml-2"
-              >
-                orders
-              </Link>
+              {isAdmin && (
+                <>
+                  <a
+                    href={`${config.pocketbaseUrl}/_/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-white/80 hover:text-white transition-colors ml-2"
+                  >
+                    database
+                  </a>
+                  <Link
+                    href="/orders"
+                    className="text-sm text-white/80 hover:text-white transition-colors ml-2"
+                  >
+                    orders
+                  </Link>
+                </>
+              )}
             </>
           )}
         </div>

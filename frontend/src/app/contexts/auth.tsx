@@ -8,6 +8,7 @@ interface User {
   email: string;
   name: string;
   token: string;
+  roles: string[];
 }
 
 interface AuthContextType {
@@ -44,12 +45,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const data = await response.json();
+    console.log('Login response data:', data);  // Debug log
+    console.log('User roles from backend:', data.user.roles);  // Debug log
     const userData = {
       id: data.user.id,
       email: data.user.email,
       name: `${data.user.first_name} ${data.user.last_name}`.trim(),
       token: data.token,
+      roles: data.user.roles || [],
     };
+    console.log('Final user data with roles:', userData);  // Debug log
 
     setUser(userData);
     localStorage.setItem('auth', JSON.stringify(userData));
@@ -84,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: data.user.email,
       name: `${data.user.first_name} ${data.user.last_name}`.trim(),
       token: data.token,
+      roles: data.user.roles || [],
     };
 
     setUser(userData);
@@ -108,4 +114,9 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+export function useIsAdmin() {
+  const { user } = useAuth();
+  return user?.roles?.includes('admin') || false;
 } 

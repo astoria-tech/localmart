@@ -474,6 +474,7 @@ async def signup(user: UserSignup):
                 "email": auth_data.record.email,
                 "first_name": auth_data.record.first_name,
                 "last_name": auth_data.record.last_name,
+                "roles": getattr(auth_data.record, 'roles', []),
             }
         }
     except Exception as e:
@@ -501,6 +502,7 @@ async def login(user: UserLogin):
                 "email": auth_data.record.email,
                 "first_name": auth_data.record.first_name,
                 "last_name": auth_data.record.last_name,
+                "roles": getattr(auth_data.record, 'roles', []),
             }
         }
     except Exception as e:
