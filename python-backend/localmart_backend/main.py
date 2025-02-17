@@ -311,12 +311,16 @@ async def get_user_orders(request: Request):
     decoded_token = decode_jwt(token)
     user_id = decoded_token['id']
 
+    # if user is admin, then filter by user, otherwise don't
+    user = pb_service.get_user_from_token(token)
+    is_admin = 'admin' in (getattr(user, 'roles', []) or [])
+
     with user_auth_context(token):
         # Get user's orders
         orders = pb_service.get_list(
             'orders',
             query_params={
-                "filter": f'user = "{user_id}"',
+                "filter": f'user = "{user_id}"' if not is_admin else '',
                 "sort": "-created",
                 "expand": "order_items(order).store_item,order_items(order).store_item.store,user"
             }
@@ -358,8 +362,13 @@ async def get_user_orders(request: Request):
                     'price': item.price_at_time
                 })
 
-            # Get user info from expanded user record
             user = order.expand.get('user', {})
+
+            if not user:
+                print(f"Order: {order}")
+                print(f"Order expand: {order.expand}")
+
+            # Get user info from expanded user record
             customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
             
             # Format user's address
