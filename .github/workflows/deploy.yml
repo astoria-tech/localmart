@@ -12,92 +12,97 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy_staging:
-    name: Deploy apps to Staging
-    if: github.ref == 'refs/heads/main'
+  setup:
+    name: Setup deployment
+    runs-on: ubuntu-latest
+    outputs:
+      config: ${{ steps.set-config.outputs.config }}
+      environment: ${{ steps.set-config.outputs.environment }}
+    steps:
+      - name: Determine deployment type
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/stable' ]]; then
+            echo "### 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🔧 Staging Deployment" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - id: set-config
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/stable' ]]; then
+            echo "config=fly.prod.toml" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          elif [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+            echo "config=fly.toml" >> $GITHUB_OUTPUT
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-db:
+    name: Deploy Database
+    needs: setup
+    environment: ${{ needs.setup.outputs.environment }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      # Deploy Database (Pocketbase)
-      - name: Deploy Database
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy Pocketbase
         working-directory: db
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
 
-      # Deploy Backend
+  deploy-backend:
+    name: Deploy Backend
+    needs: [setup, deploy-db]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Backend
         working-directory: python-backend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
 
-      # Deploy Meilisearch
-      - name: Deploy Meilisearch
-        working-directory: meilisearch
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only
-
-      # Deploy Search
-      - name: Deploy Search
-        working-directory: search
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only
-
-      # Deploy Frontend
-      - name: Deploy Frontend
-        working-directory: frontend
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only
-
-  deploy_production:
-    name: Deploy apps to Production
-    if: github.ref == 'refs/heads/stable'
+  deploy-meilisearch:
+    name: Deploy Meilisearch
+    needs: [setup, deploy-db]
+    environment: ${{ needs.setup.outputs.environment }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      # Deploy Database (Pocketbase)
-      - name: Deploy Database
-        working-directory: db
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --config fly.prod.toml --remote-only
-
-      # Deploy Backend
-      - name: Deploy Backend
-        working-directory: python-backend
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --config fly.prod.toml --remote-only
-
-      # Deploy Meilisearch
+      - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Meilisearch
         working-directory: meilisearch
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --config fly.prod.toml --remote-only
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
 
-      # Deploy Search
+  deploy-search:
+    name: Deploy Search
+    needs: [setup, deploy-meilisearch]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Search
         working-directory: search
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --config fly.prod.toml --remote-only
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
 
-      # Deploy Frontend
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: [setup, deploy-backend]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Frontend
         working-directory: frontend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --config fly.prod.toml --remote-only
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
