@@ -42,6 +42,22 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
     totalAmount: number;
   } | null>(null);
 
+  // Reset checkout state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setShowCheckoutConfirm(false);
+      setOrderSummary(null);
+      setIsCheckingOut(false);
+    }
+  }, [isOpen]);
+
+  // Reset checkout state when items change
+  useEffect(() => {
+    setShowCheckoutConfirm(false);
+    setOrderSummary(null);
+    setIsCheckingOut(false);
+  }, [items]);
+
   // Fetch store details when items change
   useEffect(() => {
     const fetchStore = async () => {
