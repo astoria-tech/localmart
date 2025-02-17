@@ -66,6 +66,8 @@ jobs:
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
 
   deploy-meilisearch:
+    # only deploy on staging for now
+    if: needs.setup.outputs.environment == 'staging'
     name: Deploy Meilisearch
     needs: [setup, deploy-db]
     environment: ${{ needs.setup.outputs.environment }}
@@ -80,6 +82,8 @@ jobs:
         run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
 
   deploy-search:
+    # only deploy on staging for now
+    if: needs.setup.outputs.environment == 'staging'
     name: Deploy Search
     needs: [setup, deploy-meilisearch]
     environment: ${{ needs.setup.outputs.environment }}
