@@ -15,6 +15,7 @@ from pocketbase import Client
 
 from .uber_direct import UberDirectClient
 from .pocketbase_service import PocketBaseService
+from .config import Config
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -26,9 +27,9 @@ logger.info(f"Initializing PocketBase with URL: {POCKETBASE_URL}")
 pb_service = PocketBaseService(POCKETBASE_URL)
 
 # Get Uber Direct credentials from environment
-UBER_CUSTOMER_ID = os.getenv('LOCALMART_UBER_DIRECT_CUSTOMER_ID')
-UBER_CLIENT_ID = os.getenv('LOCALMART_UBER_DIRECT_CLIENT_ID')
-UBER_CLIENT_SECRET = os.getenv('LOCALMART_UBER_DIRECT_CLIENT_SECRET')
+UBER_CUSTOMER_ID = Config.UBER_CUSTOMER_ID
+UBER_CLIENT_ID = Config.UBER_CLIENT_ID
+UBER_CLIENT_SECRET = Config.UBER_CLIENT_SECRET
 
 # Initialize Uber Direct client
 uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SECRET)
@@ -37,10 +38,10 @@ uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SEC
 active_deliveries: Set[str] = set()
 
 # Initialize Stripe
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+stripe.api_key = Config.STRIPE_SECRET_KEY
 
 # Initialize Stripe webhook secret
-STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
+STRIPE_WEBHOOK_SECRET = Config.STRIPE_WEBHOOK_SECRET
 
 @contextmanager
 def user_auth_context(token: str):
