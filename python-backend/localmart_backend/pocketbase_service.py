@@ -1,4 +1,6 @@
 import logging
+import base64
+import json
 from typing import Dict, List, Any, Optional
 from pocketbase import PocketBase
 
@@ -8,6 +10,7 @@ class PocketBaseService:
     def __init__(self, url: str = 'http://pocketbase:8090'):
         self.url = url
         self.client = PocketBase(url)
+        self.pb = self.client  # Alias for compatibility
 
     def set_token(self, token: str) -> None:
         """Set the auth token for subsequent requests"""
@@ -121,4 +124,44 @@ class PocketBaseService:
             return result
         except Exception as e:
             logger.error(f"Error authenticating user {email}: {str(e)}")
-            raise 
+            raise
+
+    def get_user_from_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get user information from a JWT token"""
+        try:
+            # Set the token for this request
+            self.set_token(token)
+
+            # Get the decoded token data
+            parts = token.split('.')
+            if len(parts) != 3:
+                logger.error("Invalid JWT token format")
+                return None
+
+            # Decode the payload (second part)
+            try:
+                # Add padding if needed
+                padding = len(parts[1]) % 4
+                if padding:
+                    parts[1] += '=' * (4 - padding)
+
+                payload = base64.b64decode(parts[1])
+                token_data = json.loads(payload)
+            except Exception as e:
+                logger.error(f"Error decoding token: {str(e)}")
+                return None
+
+            # Get user ID from token
+            user_id = token_data.get('id')
+            if not user_id:
+                logger.error("No user ID in token")
+                return None
+
+            # Get user from database
+            user = self.get_one('users', user_id)
+            return user
+
+        except Exception as e:
+            logger.error(f"Error getting user from token: {str(e)}")
+            self.clear_token()  # Only clear token on error
+            return None 
