@@ -7,6 +7,8 @@ import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
 import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { config } from '@/config';
+import { useStoreRoles } from '@/app/hooks/useStoreRoles';
+import Link from 'next/link';
 
 interface Store {
   id: string;
@@ -30,6 +32,7 @@ interface StoreItem {
 
 export default function StoreContent({ storeId }: { storeId: string }) {
   const { addItem } = useCart();
+  const { isAdmin } = useStoreRoles(storeId);
   const [store, setStore] = useState<Store | null>(null);
   const [items, setItems] = useState<StoreItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,15 +108,24 @@ export default function StoreContent({ storeId }: { storeId: string }) {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
-      <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
+      <div className="bg-white/50 backdrop-blur-sm border-b pt-24">
         <div className="h-32 bg-gradient-to-r from-[#2A9D8F]/10 to-[#2A9D8F]/5 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-5"></div>
           <div className="container mx-auto px-4 h-full">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between h-full py-6">
               {/* Store Name and Type */}
-              <div>
+              <div className="relative z-10">
                 <h1 className="text-2xl font-bold text-[#2D3748]">{store.name}</h1>
                 <p className="text-[#4A5568] text-sm">Local market & grocery</p>
+                {/* Add dashboard link for store admins */}
+                {isAdmin && (
+                  <Link
+                    href={`/store/${storeId}/dashboard`}
+                    className="inline-flex items-center mt-2 text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors"
+                  >
+                    View Dashboard
+                  </Link>
+                )}
                 {/* Social Links */}
                 <div className="flex gap-3 mt-3">
                   <a

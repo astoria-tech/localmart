@@ -322,7 +322,7 @@ async def get_user_orders(request: Request):
             query_params={
                 "filter": f'user = "{user_id}"' if not is_admin else '',
                 "sort": "-created",
-                "expand": "order_items(order).store_item,order_items(order).store_item.store,user"
+                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store,user"
             }
         )
 
@@ -333,7 +333,7 @@ async def get_user_orders(request: Request):
             stores_dict = {}
 
             # Get all order items for this order
-            order_items = order.expand.get('order_items(order)', [])
+            order_items = order.expand.get('order_items_via_order', [])
 
             for item in order_items:
                 if not hasattr(item, 'expand') or not item.expand.get('store_item'):
@@ -841,3 +841,148 @@ async def stripe_webhook(request: Request):
             logger.error(json.dumps(payment_intent, indent=2))
 
     return {"status": "success"}
+
+@app.get("/api/v0/stores/{store_id}/roles", response_model=Dict)
+async def get_store_roles(store_id: str, request: Request):
+    """Get the current user's roles for a specific store"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    with user_auth_context(token):
+        try:
+            # Check if user is a global admin first
+            user = pb_service.get_user_from_token(token)
+            if 'admin' in (getattr(user, 'roles', []) or []):
+                return {"roles": ["admin"]}
+
+            # Get store roles for this user and store
+            store_roles = pb_service.get_list(
+                'store_roles',
+                query_params={
+                    "filter": f'user = "{user_id}" && store = "{store_id}"',
+                    "expand": "role"
+                }
+            )
+            
+            roles = [sr.role for sr in store_roles.items]
+            return {"roles": roles}
+        except Exception as e:
+            logger.error(f"Error fetching store roles: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch store roles: {str(e)}"
+            )
+
+@app.get("/api/v0/stores/{store_id}/orders", response_model=List[Dict])
+async def get_store_orders(store_id: str, request: Request):
+    """Get orders for a specific store (requires store admin role)"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    with user_auth_context(token):
+        try:
+            # Check if user is a global admin or store admin
+            user = pb_service.get_user_from_token(token)
+            is_global_admin = 'admin' in (getattr(user, 'roles', []) or [])
+            
+            if not is_global_admin:
+                # Check store roles
+                store_roles = pb_service.get_list(
+                    'store_roles',
+                    query_params={
+                        "filter": f'user = "{user_id}" && store = "{store_id}"'
+                    }
+                )
+                
+                if not any(sr.role == 'admin' for sr in store_roles.items):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You don't have permission to view this store's orders"
+                    )
+
+            # Get all orders with expanded order items and store items
+            orders = pb_service.get_list(
+                'orders',
+                query_params={
+                    "sort": "-created",
+                    "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store,user"
+                }
+            )
+
+            # Format orders for response
+            formatted_orders = []
+            for order in orders.items:
+                stores_dict = {}
+                order_items = order.expand.get('order_items_via_order', [])
+
+                # Check if any order items belong to this store
+                has_store_items = False
+                for item in order_items:
+                    if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                        continue
+
+                    store_item = item.expand['store_item']
+                    if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                        continue
+
+                    store = store_item.expand['store']
+                    if store.id != store_id:  # Skip items not from this store
+                        continue
+
+                    has_store_items = True
+                    store_id_key = store.id
+                    if store_id_key not in stores_dict:
+                        stores_dict[store_id_key] = {
+                            'store': {
+                                'id': store.id,
+                                'name': store.name
+                            },
+                            'items': []
+                        }
+
+                    stores_dict[store_id_key]['items'].append({
+                        'id': item.id,
+                        'name': store_item.name,
+                        'quantity': item.quantity,
+                        'price': item.price_at_time
+                    })
+
+                # Only include orders that have items from this store
+                if has_store_items:
+                    user = order.expand.get('user', {})
+                    customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
+                    
+                    delivery_address = {
+                        'street_address': [user.street_1] + ([user.street_2] if user.street_2 else []),
+                        'city': user.city,
+                        'state': user.state,
+                        'zip_code': user.zip,
+                        'country': 'US'
+                    } if user else None
+
+                    formatted_order = {
+                        'id': order.id,
+                        'created': order.created,
+                        'status': order.status,
+                        'payment_status': order.payment_status,
+                        'delivery_fee': order.delivery_fee,
+                        'total_amount': order.total_amount,
+                        'tax_amount': order.tax_amount,
+                        'customer_name': customer_name,
+                        'customer_phone': getattr(user, 'phone_number', None),
+                        'delivery_address': delivery_address,
+                        'stores': list(stores_dict.values())
+                    }
+                    formatted_orders.append(formatted_order)
+
+            return formatted_orders
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching store orders: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch store orders: {str(e)}"
+            )

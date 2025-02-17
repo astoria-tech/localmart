@@ -74,7 +74,7 @@ export default function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-50">
+    <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-30">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2 group">
