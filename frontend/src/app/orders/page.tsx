@@ -5,7 +5,7 @@ import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
 import { config } from '@/config';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface OrderItem {
   id: string;
@@ -41,6 +41,12 @@ interface Order {
     };
     items: OrderItem[];
   }>;
+}
+
+interface DailyCount {
+  date: string;
+  timestamp: number;
+  [storeId: string]: string | number; // Allow string indexes for store IDs
 }
 
 const statusColors = {
@@ -114,24 +120,65 @@ function calculateDailyOrderCounts(orders: Order[]) {
     return date;
   });
 
-  // Initialize counts for each day
-  const dailyCounts = days.map(date => ({
-    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    count: 0,
-    timestamp: date.getTime() // for sorting
-  }));
+  // Get unique stores from all orders
+  const storeIds = new Set<string>();
+  const storeNames = new Map<string, string>();
+  orders.forEach(order => {
+    order.stores.forEach(store => {
+      storeIds.add(store.store.id);
+      storeNames.set(store.store.id, store.store.name);
+    });
+  });
 
-  // Count orders for each day
+  // Initialize counts for each day with store-specific counts
+  const dailyCounts: DailyCount[] = days.map(date => {
+    const baseCount = {
+      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      timestamp: date.getTime()
+    };
+
+    // Add a count property for each store, initialized to 0
+    const storeCounts: { [key: string]: number } = {};
+    storeIds.forEach(storeId => {
+      storeCounts[storeId] = 0;
+    });
+
+    return {
+      ...baseCount,
+      ...storeCounts
+    };
+  });
+
+  // Count orders for each day and store
   orders.forEach(order => {
     const orderDate = new Date(order.created);
     const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const dayData = dailyCounts.find(d => d.date === orderDateStr);
+    
     if (dayData) {
-      dayData.count++;
+      order.stores.forEach(store => {
+        const currentCount = dayData[store.store.id] as number;
+        dayData[store.store.id] = currentCount + 1;
+      });
     }
   });
 
-  return dailyCounts;
+  // Convert storeIds to array for consistent ordering
+  const storeIdsArray = Array.from(storeIds);
+
+  return {
+    data: dailyCounts,
+    stores: storeIdsArray.map(id => ({
+      id,
+      name: storeNames.get(id) || 'Unknown Store'
+    }))
+  };
+}
+
+// Add color generation function
+function getStoreColor(index: number, opacity: number = 0.9) {
+  const hue = (166 + index * 30) % 360;
+  return `hsla(${hue}, 85%, 35%, ${opacity})`;
 }
 
 export default function OrdersDashboard() {
@@ -293,10 +340,13 @@ export default function OrdersDashboard() {
         {/* Orders Chart */}
         <div className="mb-12">
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders (Last 30 Days)</h2>
+            <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders by Store (Last 30 Days)</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={calculateDailyOrderCounts(orders)} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                <BarChart 
+                  data={calculateDailyOrderCounts(orders).data} 
+                  margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                >
                   <XAxis 
                     dataKey="date" 
                     angle={-45}
@@ -316,14 +366,18 @@ export default function OrdersDashboard() {
                       borderRadius: '0.5rem'
                     }}
                     cursor={{ fill: 'rgba(42, 157, 143, 0.1)' }}
-                    labelFormatter={(label) => `Orders on ${label}`}
                   />
-                  <Bar 
-                    dataKey="count" 
-                    fill="#2A9D8F"
-                    radius={[4, 4, 0, 0]}
-                    name="Orders"
-                  />
+                  <Legend />
+                  {calculateDailyOrderCounts(orders).stores.map((store, index) => (
+                    <Bar 
+                      key={store.id}
+                      dataKey={store.id}
+                      name={store.name}
+                      stackId="stores"
+                      fill={getStoreColor(index)}
+                      radius={[index === 0 ? 4 : 0, index === 0 ? 4 : 0, 0, 0]}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -365,78 +419,88 @@ export default function OrdersDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2A9D8F]/10">
-              {orders.map((order) => (
-                <tr key={order.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                    #{order.id.slice(-6)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                    {formatDateTime(order.created)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                    {order.customer_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                    {order.customer_phone || '-'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-[#4A5568]">
-                    {order.delivery_address ? (
-                      <>
-                        <div>
-                          {order.delivery_address.street_address.filter(Boolean).join(', ')}
-                        </div>
-                        <div>
-                          {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-gray-400 italic">No address available</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[order.status as keyof typeof statusColors]}`}>
-                        {statusLabels[order.status as keyof typeof statusLabels]}
-                      </span>
-                      <select
-                        value={order.status}
-                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className="text-sm border-[#2A9D8F]/20 rounded-md focus:ring-[#2A9D8F] focus:border-[#2A9D8F]"
-                      >
-                        {Object.entries(statusLabels).map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentStatusColors[order.payment_status as keyof typeof paymentStatusColors]}`}>
-                      {paymentStatusLabels[order.payment_status as keyof typeof paymentStatusLabels]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-[#4A5568]">
-                      {order.stores.map((store) => (
-                        <div key={store.store.id} className="mb-2 last:mb-0">
-                          <div className="font-medium text-[#2D3748]">{store.store.name}</div>
-                          {store.items.map((item) => (
-                            <div key={item.id} className="ml-4">
-                              {item.quantity}x {item.name} (${item.price.toFixed(2)})
-                            </div>
+              {orders.map((order) => {
+                // Get the first store's index for coloring
+                const storeIndex = calculateDailyOrderCounts(orders).stores
+                  .findIndex(s => s.id === order.stores[0]?.store.id);
+
+                return (
+                  <tr 
+                    key={order.id}
+                    style={{ backgroundColor: getStoreColor(storeIndex, 0.15) }}
+                    className="transition-colors hover:bg-white/60"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                      #{order.id.slice(-6)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
+                      {formatDateTime(order.created)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                      {order.customer_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
+                      {order.customer_phone || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[#4A5568]">
+                      {order.delivery_address ? (
+                        <>
+                          <div>
+                            {order.delivery_address.street_address.filter(Boolean).join(', ')}
+                          </div>
+                          <div>
+                            {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-gray-400 italic">No address available</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[order.status as keyof typeof statusColors]}`}>
+                          {statusLabels[order.status as keyof typeof statusLabels]}
+                        </span>
+                        <select
+                          value={order.status}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          className="text-sm border-[#2A9D8F]/20 rounded-md focus:ring-[#2A9D8F] focus:border-[#2A9D8F]"
+                        >
+                          {Object.entries(statusLabels).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
                           ))}
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                    ${order.total_amount.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentStatusColors[order.payment_status as keyof typeof paymentStatusColors]}`}>
+                        {paymentStatusLabels[order.payment_status as keyof typeof paymentStatusLabels]}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-[#4A5568]">
+                        {order.stores.map((store) => (
+                          <div key={store.store.id} className="mb-2 last:mb-0">
+                            <div className="font-medium text-[#2D3748]">{store.store.name}</div>
+                            {store.items.map((item) => (
+                              <div key={item.id} className="ml-4">
+                                {item.quantity}x {item.name} (${item.price.toFixed(2)})
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                      ${order.total_amount.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
     </main>
   );
-} 
+}
