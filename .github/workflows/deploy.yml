@@ -6,6 +6,11 @@ on:
       - main
       - stable
 
+# Ensure only one deployment workflow runs at a time
+concurrency:
+  group: "deploy"
+  cancel-in-progress: false
+
 jobs:
   deploy_staging:
     name: Deploy apps to Staging
@@ -27,6 +32,20 @@ jobs:
       # Deploy Backend
       - name: Deploy Backend
         working-directory: python-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --remote-only
+
+      # Deploy Meilisearch
+      - name: Deploy Meilisearch
+        working-directory: meilisearch
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --remote-only
+
+      # Deploy Search
+      - name: Deploy Search
+        working-directory: search
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --remote-only
@@ -58,6 +77,20 @@ jobs:
       # Deploy Backend
       - name: Deploy Backend
         working-directory: python-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config fly.prod.toml --remote-only
+
+      # Deploy Meilisearch
+      - name: Deploy Meilisearch
+        working-directory: meilisearch
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config fly.prod.toml --remote-only
+
+      # Deploy Search
+      - name: Deploy Search
+        working-directory: search
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --config fly.prod.toml --remote-only
