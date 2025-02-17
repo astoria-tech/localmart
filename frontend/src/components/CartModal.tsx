@@ -34,6 +34,13 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string>('');
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
+  const [orderSummary, setOrderSummary] = useState<{
+    subtotalAmount: number;
+    taxAmount: number;
+    deliveryFee: number;
+    totalAmount: number;
+  } | null>(null);
 
   // Fetch store details when items change
   useEffect(() => {
@@ -103,7 +110,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
     }
   }, [isOpen, user]);
 
-  const handleCheckout = async () => {
+  const handleCheckoutClick = () => {
     if (!user) {
       toast.error('Please log in to checkout');
       return;
@@ -119,16 +126,30 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       return;
     }
 
+    // Calculate amounts
+    const subtotalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const taxRate = 0.08875; // Example tax rate (8.875%)
+    const taxAmount = subtotalAmount * taxRate;
+    const deliveryFee = 5.99; // Example delivery fee
+    const totalAmount = subtotalAmount + taxAmount + deliveryFee;
+
+    setOrderSummary({
+      subtotalAmount,
+      taxAmount,
+      deliveryFee,
+      totalAmount
+    });
+    setShowCheckoutConfirm(true);
+  };
+
+  const handleCheckout = async () => {
+    if (!user || !store || !selectedCardId || !orderSummary) {
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
-      // Calculate amounts
-      const subtotalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const taxRate = 0.08875; // Example tax rate (8.875%)
-      const taxAmount = subtotalAmount * taxRate;
-      const deliveryFee = 5.99; // Example delivery fee
-      const totalAmount = subtotalAmount + taxAmount + deliveryFee;
-
       // Create order payload
       const orderData = {
         user_id: user.id,
@@ -138,10 +159,10 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
           quantity: item.quantity,
           price: item.price
         })),
-        subtotal_amount: subtotalAmount,
-        tax_amount: taxAmount,
-        delivery_fee: deliveryFee,
-        total_amount: totalAmount,
+        subtotal_amount: orderSummary.subtotalAmount,
+        tax_amount: orderSummary.taxAmount,
+        delivery_fee: orderSummary.deliveryFee,
+        total_amount: orderSummary.totalAmount,
         payment_method_id: selectedCardId,
         delivery_address: {
           street_address: ["123 Main St"], // TODO: Get from user input
@@ -182,6 +203,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       toast.error('Failed to place order. Please try again.');
     } finally {
       setIsCheckingOut(false);
+      setShowCheckoutConfirm(false);
     }
   };
 
@@ -321,13 +343,51 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                         Shipping and taxes will be calculated at checkout.
                       </p>
                       <div className="mt-6">
-                        <button
-                          onClick={handleCheckout}
-                          disabled={isCheckingOut || items.length === 0 || savedCards.length === 0}
-                          className="w-full flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isCheckingOut ? 'Processing...' : 'Checkout'}
-                        </button>
+                        {showCheckoutConfirm ? (
+                          <div className="space-y-4">
+                            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 space-y-2">
+                              <div className="flex justify-between text-sm text-[#4A5568]">
+                                <span>Subtotal</span>
+                                <span>${orderSummary?.subtotalAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm text-[#4A5568]">
+                                <span>Tax (8.875%)</span>
+                                <span>${orderSummary?.taxAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm text-[#4A5568]">
+                                <span>Delivery Fee</span>
+                                <span>${orderSummary?.deliveryFee.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-base font-medium text-[#2D3748] pt-2 border-t border-[#2A9D8F]/10">
+                                <span>Total</span>
+                                <span>${orderSummary?.totalAmount.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => setShowCheckoutConfirm(false)}
+                                className="flex-1 rounded-md border border-[#2A9D8F] bg-white px-6 py-3 text-base font-medium text-[#2A9D8F] shadow-sm hover:bg-[#2A9D8F]/5"
+                              >
+                                Back
+                              </button>
+                              <button
+                                onClick={handleCheckout}
+                                disabled={isCheckingOut}
+                                className="flex-1 rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isCheckingOut ? 'Processing...' : 'Submit Order'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleCheckoutClick}
+                            disabled={isCheckingOut || items.length === 0 || savedCards.length === 0}
+                            className="w-full flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isCheckingOut ? 'Processing...' : 'Checkout'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
