@@ -97,6 +97,7 @@ app.add_middleware(
         "http://localhost:3000",  # Local development
         "https://localmart-frontend.fly.dev",  # Staging
         "https://localmart-frontend-prod.fly.dev"  # Production
+        "https://localmart.nyc"  # Production
     ],
     allow_credentials=True,
     allow_methods=["*"],
