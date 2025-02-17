@@ -103,7 +103,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Local development
-        "https://localmart-frontend.fly.dev"  # Production
+        "https://localmart-frontend.fly.dev",  # Staging
+        "https://localmart-frontend-prod.fly.dev",  # Production
+        "https://localmart.nyc"  # Production
     ],
     allow_credentials=True,
     allow_methods=["*"],

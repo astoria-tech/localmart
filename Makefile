@@ -21,7 +21,24 @@ deploy-pocketbase:
 	cd db && fly deploy
 
 deploy-meilisearch:
-	cd search/meilisearch && fly deploy
+	cd meilisearch && fly deploy
 
 deploy-search:
 	cd search && fly deploy
+
+deploy-frontend-prod:
+	cd frontend && fly deploy --config fly.prod.toml
+
+deploy-backend-prod:
+	cd python-backend && fly deploy --config fly.prod.toml
+
+deploy-pocketbase-prod:
+	cd db && fly deploy --config fly.prod.toml
+
+deploy-meilisearch-prod:
+	cd meilisearch && fly deploy --config fly.prod.toml
+
+deploy-search-prod:
+	cd search && fly deploy --config fly.prod.toml
+
+deploy-all-prod: deploy-frontend-prod deploy-backend-prod deploy-pocketbase-prod deploy-meilisearch-prod deploy-search-prod

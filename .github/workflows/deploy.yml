@@ -3,34 +3,145 @@ name: Deploy to Fly.io
 on:
   push:
     branches:
-    - azlyth/fly
-    #   - main
+      - main
+      - stable
+
+# Ensure only one deployment workflow runs at a time
+concurrency:
+  group: "deploy-${{ github.ref_name }}"
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy apps
+  setup:
+    name: Setup deployment
+    runs-on: ubuntu-latest
+    outputs:
+      config: ${{ steps.set-config.outputs.config }}
+      environment: ${{ steps.set-config.outputs.environment }}
+    steps:
+      - name: Determine deployment type
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/stable' ]]; then
+            echo "### 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🔧 Staging Deployment" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - id: set-config
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/stable' ]]; then
+            echo "config=fly.prod.toml" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          elif [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+            echo "config=fly.toml" >> $GITHUB_OUTPUT
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-db:
+    name: Deploy Database
+    needs: setup
+    environment: ${{ needs.setup.outputs.environment }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Deploy Database
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy Pocketbase
         working-directory: db
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only 
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: db
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Pocketbase URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
 
+  deploy-backend:
+    name: Deploy Backend
+    needs: [setup, deploy-db]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Backend
         working-directory: python-backend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: python-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: |
-          flyctl deploy --remote-only
+          echo "### 🌐 Backend URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
 
+  deploy-meilisearch:
+    # only deploy on staging for now
+    if: needs.setup.outputs.environment == 'staging'
+    name: Deploy Meilisearch
+    needs: [setup, deploy-db]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy Meilisearch
+        working-directory: meilisearch
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: meilisearch
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Meilisearch URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
+
+  deploy-search:
+    # only deploy on staging for now
+    if: needs.setup.outputs.environment == 'staging'
+    name: Deploy Search
+    needs: [setup, deploy-meilisearch]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy Search
+        working-directory: search
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: search
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Search URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: [setup, deploy-backend]
+    environment: ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Frontend
         working-directory: frontend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --config ${{ needs.setup.outputs.config }} --remote-only
+      - name: Print App URL
+        working-directory: frontend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: |
+          echo "### 🌐 Frontend URL" >> $GITHUB_STEP_SUMMARY
+          echo "$(flyctl status --config ${{ needs.setup.outputs.config }} --json | jq -r '.Hostname')" >> $GITHUB_STEP_SUMMARY
