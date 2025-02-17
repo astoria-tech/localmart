@@ -186,8 +186,38 @@ export default function OrdersDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(Object.keys(statusLabels)));
+  const [searchTerm, setSearchTerm] = useState('');
 
   const metrics = calculateMetrics(orders);
+
+  // Filter orders based on selected statuses and search term
+  const filteredOrders = orders.filter(order => {
+    const matchesStatus = selectedStatuses.has(order.status);
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+      order.id.toLowerCase().includes(searchLower) ||
+      order.customer_name.toLowerCase().includes(searchLower);
+    return matchesStatus && matchesSearch;
+  });
+
+  // Toggle status filter
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(status)) {
+        newSet.delete(status);
+      } else {
+        newSet.add(status);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/deselect all statuses
+  const toggleAll = (select: boolean) => {
+    setSelectedStatuses(new Set(select ? Object.keys(statusLabels) : []));
+  };
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -384,6 +414,77 @@ export default function OrdersDashboard() {
           </div>
         </div>
 
+        {/* Filters Section */}
+        <div className="mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-6">
+              {/* Status Filter */}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-[#2D3748]">Filter by Status</h3>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => toggleAll(true)}
+                      className="text-xs text-[#2A9D8F] hover:text-[#40B4A6] transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={() => toggleAll(false)}
+                      className="text-xs text-[#2A9D8F] hover:text-[#40B4A6] transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <label
+                      key={value}
+                      className={`
+                        flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all
+                        ${selectedStatuses.has(value) 
+                          ? 'border-[#2A9D8F] bg-[#2A9D8F]/5 text-[#2D3748]' 
+                          : 'border-[#2A9D8F]/20 bg-white/50 text-[#4A5568]'
+                        }
+                        hover:border-[#2A9D8F] hover:bg-[#2A9D8F]/5
+                      `}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedStatuses.has(value)}
+                        onChange={() => toggleStatus(value)}
+                        className="h-4 w-4 rounded border-[#2A9D8F]/20 text-[#2A9D8F] focus:ring-[#2A9D8F]"
+                      />
+                      <span className="text-sm whitespace-nowrap">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="sm:w-72">
+                <h3 className="text-sm font-medium text-[#2D3748] mb-3">Search Orders</h3>
+                <input
+                  type="text"
+                  placeholder="Search by order ID or customer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-[#2A9D8F]/20 bg-white focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Results Summary */}
+        <div className="mb-4 text-sm text-[#4A5568]">
+          Showing {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
+          {selectedStatuses.size < Object.keys(statusLabels).length && 
+            ` with status${selectedStatuses.size === 1 ? '' : 'es'}: ${Array.from(selectedStatuses).map(s => statusLabels[s as keyof typeof statusLabels]).join(', ')}`}
+          {searchTerm && ` matching "${searchTerm}"`}
+        </div>
+
         {/* Orders Table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-[#2A9D8F]/10">
@@ -419,7 +520,7 @@ export default function OrdersDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2A9D8F]/10">
-              {orders.map((order) => {
+              {filteredOrders.map((order) => {
                 // Get the first store's index for coloring
                 const storeIndex = calculateDailyOrderCounts(orders).stores
                   .findIndex(s => s.id === order.stores[0]?.store.id);
