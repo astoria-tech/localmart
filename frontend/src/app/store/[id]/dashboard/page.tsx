@@ -8,6 +8,7 @@ import { config } from '@/config';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface OrderItem {
   id: string;
@@ -98,6 +99,39 @@ function calculateMetrics(orders: Order[]) {
     pendingOrders,
     avgOrderValue
   };
+}
+
+function calculateDailyOrderCounts(orders: Order[]) {
+  // Get date range for last 30 days
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 29); // 30 days including today
+
+  // Create array of last 30 days
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const date = new Date(thirtyDaysAgo);
+    date.setDate(thirtyDaysAgo.getDate() + i);
+    return date;
+  });
+
+  // Initialize counts for each day
+  const dailyCounts = days.map(date => ({
+    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    count: 0,
+    timestamp: date.getTime() // for sorting
+  }));
+
+  // Count orders for each day
+  orders.forEach(order => {
+    const orderDate = new Date(order.created);
+    const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dayData = dailyCounts.find(d => d.date === orderDateStr);
+    if (dayData) {
+      dayData.count++;
+    }
+  });
+
+  return dailyCounts;
 }
 
 export default function StoreDashboard({ params }: { params: Promise<{ id: string }> }) {
@@ -280,6 +314,46 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
                 </div>
                 <p className="text-2xl font-bold text-[#2D3748]">${metrics.totalRevenue.toFixed(2)}</p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Orders Chart */}
+        <div className="mb-12">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders (Last 30 Days)</h2>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={calculateDailyOrderCounts(orders)} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={70}
+                    tick={{ fill: '#4A5568', fontSize: 11 }}
+                    interval={1}
+                  />
+                  <YAxis 
+                    allowDecimals={false}
+                    tick={{ fill: '#4A5568', fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderColor: '#2A9D8F',
+                      borderRadius: '0.5rem'
+                    }}
+                    cursor={{ fill: 'rgba(42, 157, 143, 0.1)' }}
+                    labelFormatter={(label) => `Orders on ${label}`}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#2A9D8F"
+                    radius={[4, 4, 0, 0]}
+                    name="Orders"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
 import { config } from '@/config';
+import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface OrderItem {
   id: string;
@@ -85,11 +87,60 @@ const formatDateTime = (isoString: string) => {
   }).format(utcDate);
 };
 
+function calculateMetrics(orders: Order[]) {
+  const totalOrders = orders.length;
+  const totalRevenue = orders.reduce((sum, order) => sum + order.total_amount, 0);
+  const pendingOrders = orders.filter(order => order.status === 'pending').length;
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  return {
+    totalOrders,
+    totalRevenue,
+    pendingOrders,
+    avgOrderValue
+  };
+}
+
+function calculateDailyOrderCounts(orders: Order[]) {
+  // Get date range for last 30 days
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 29); // 30 days including today
+
+  // Create array of last 30 days
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const date = new Date(thirtyDaysAgo);
+    date.setDate(thirtyDaysAgo.getDate() + i);
+    return date;
+  });
+
+  // Initialize counts for each day
+  const dailyCounts = days.map(date => ({
+    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    count: 0,
+    timestamp: date.getTime() // for sorting
+  }));
+
+  // Count orders for each day
+  orders.forEach(order => {
+    const orderDate = new Date(order.created);
+    const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dayData = dailyCounts.find(d => d.date === orderDateStr);
+    if (dayData) {
+      dayData.count++;
+    }
+  });
+
+  return dailyCounts;
+}
+
 export default function OrdersDashboard() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const metrics = calculateMetrics(orders);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -182,8 +233,104 @@ export default function OrdersDashboard() {
   return (
     <main className="min-h-screen bg-[#F5F2EB] pt-24">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-[#2D3748] mb-8">Orders Dashboard</h1>
-        
+        {/* Header Section */}
+        <div className="mb-12">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+            <div>
+              <h1 className="text-4xl font-bold text-[#2D3748] mb-2">Orders Dashboard</h1>
+              <p className="text-lg text-[#4A5568]">All Orders Overview</p>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Pending Orders */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-[#2A9D8F]/10 rounded-lg">
+                    <ClockIcon className="w-5 h-5 text-[#2A9D8F]" />
+                  </div>
+                  <h3 className="text-sm font-medium text-[#4A5568]">Pending Orders</h3>
+                </div>
+                <p className="text-2xl font-bold text-[#2D3748]">{metrics.pendingOrders}</p>
+              </div>
+
+              {/* Total Orders */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-[#2A9D8F]/10 rounded-lg">
+                    <ShoppingBagIcon className="w-5 h-5 text-[#2A9D8F]" />
+                  </div>
+                  <h3 className="text-sm font-medium text-[#4A5568]">Total Orders</h3>
+                </div>
+                <p className="text-2xl font-bold text-[#2D3748]">{metrics.totalOrders}</p>
+              </div>
+
+              {/* Average Order Value */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-[#2A9D8F]/10 rounded-lg">
+                    <ChartBarIcon className="w-5 h-5 text-[#2A9D8F]" />
+                  </div>
+                  <h3 className="text-sm font-medium text-[#4A5568]">Avg. Order Value</h3>
+                </div>
+                <p className="text-2xl font-bold text-[#2D3748]">${metrics.avgOrderValue.toFixed(2)}</p>
+              </div>
+
+              {/* Total Revenue */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-[#2A9D8F]/10 rounded-lg">
+                    <CurrencyDollarIcon className="w-5 h-5 text-[#2A9D8F]" />
+                  </div>
+                  <h3 className="text-sm font-medium text-[#4A5568]">Total Revenue</h3>
+                </div>
+                <p className="text-2xl font-bold text-[#2D3748]">${metrics.totalRevenue.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Orders Chart */}
+        <div className="mb-12">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders (Last 30 Days)</h2>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={calculateDailyOrderCounts(orders)} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={70}
+                    tick={{ fill: '#4A5568', fontSize: 11 }}
+                    interval={1}
+                  />
+                  <YAxis 
+                    allowDecimals={false}
+                    tick={{ fill: '#4A5568', fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderColor: '#2A9D8F',
+                      borderRadius: '0.5rem'
+                    }}
+                    cursor={{ fill: 'rgba(42, 157, 143, 0.1)' }}
+                    labelFormatter={(label) => `Orders on ${label}`}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#2A9D8F"
+                    radius={[4, 4, 0, 0]}
+                    name="Orders"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Orders Table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-[#2A9D8F]/10">
             <thead className="bg-[#2A9D8F]/5">
