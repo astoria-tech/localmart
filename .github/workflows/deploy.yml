@@ -3,12 +3,13 @@ name: Deploy to Fly.io
 on:
   push:
     branches:
-    - azlyth/fly
-    #   - main
+      - main
+      - stable
 
 jobs:
-  deploy:
-    name: Deploy apps
+  deploy_staging:
+    name: Deploy apps to Staging
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,21 +17,54 @@ jobs:
       - name: Setup Flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
 
+      # Deploy Database (Pocketbase)
       - name: Deploy Database
         working-directory: db
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: flyctl deploy --remote-only 
+        run: flyctl deploy --remote-only
 
+      # Deploy Backend
       - name: Deploy Backend
         working-directory: python-backend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
-        run: |
-          flyctl deploy --remote-only
+        run: flyctl deploy --remote-only
 
+      # Deploy Frontend
       - name: Deploy Frontend
         working-directory: frontend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
         run: flyctl deploy --remote-only
+
+  deploy_production:
+    name: Deploy apps to Production
+    if: github.ref == 'refs/heads/stable'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Deploy Database (Pocketbase)
+      - name: Deploy Database
+        working-directory: db
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config fly.prod.toml --remote-only
+
+      # Deploy Backend
+      - name: Deploy Backend
+        working-directory: python-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config fly.prod.toml --remote-only
+
+      # Deploy Frontend
+      - name: Deploy Frontend
+        working-directory: frontend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_TOKEN }}
+        run: flyctl deploy --config fly.prod.toml --remote-only
