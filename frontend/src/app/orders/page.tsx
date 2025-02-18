@@ -314,8 +314,7 @@ export default function OrdersDashboard() {
         <div className="mb-12">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div>
-              <h1 className="text-4xl font-bold text-[#2D3748] mb-2">Orders Dashboard</h1>
-              <p className="text-lg text-[#4A5568]">All Orders Overview</p>
+              <h1 className="text-4xl font-bold text-[#2D3748] mb-2">Localmart Dashboard</h1>
             </div>
 
             {/* Metrics Grid */}

@@ -8,7 +8,8 @@ import { config } from '@/config';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import Link from 'next/link';
 
 interface OrderItem {
   id: string;
@@ -42,6 +43,12 @@ interface Order {
     country: string;
   } | null;
   stores: Store[];
+}
+
+interface DailyCount {
+  date: string;
+  timestamp: number;
+  [itemName: string]: string | number; // Allow string indexes for item names
 }
 
 const statusColors = {
@@ -93,12 +100,65 @@ function calculateMetrics(orders: Order[]) {
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+  // Calculate items per order
+  const totalItems = orders.reduce((sum, order) => {
+    return sum + order.stores[0]?.items.reduce((itemSum, item) => itemSum + item.quantity, 0) || 0;
+  }, 0);
+  const avgItemsPerOrder = totalOrders > 0 ? totalItems / totalOrders : 0;
+
+  // Calculate popular items
+  const itemCounts: { [key: string]: { count: number; revenue: number; name: string } } = {};
+  orders.forEach(order => {
+    order.stores[0]?.items.forEach(item => {
+      if (!itemCounts[item.name]) {
+        itemCounts[item.name] = { count: 0, revenue: 0, name: item.name };
+      }
+      itemCounts[item.name].count += item.quantity;
+      itemCounts[item.name].revenue += item.price * item.quantity;
+    });
+  });
+
+  const popularItems = Object.entries(itemCounts)
+    .map(([name, data]) => ({ id: name, ...data }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  // Calculate week-over-week growth
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  const thisWeekRevenue = orders
+    .filter(order => new Date(order.created) >= oneWeekAgo)
+    .reduce((sum, order) => sum + order.total_amount, 0);
+
+  const lastWeekRevenue = orders
+    .filter(order => {
+      const date = new Date(order.created);
+      return date >= twoWeeksAgo && date < oneWeekAgo;
+    })
+    .reduce((sum, order) => sum + order.total_amount, 0);
+
+  const weekOverWeekGrowth = lastWeekRevenue > 0 
+    ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 
+    : 0;
+
   return {
     totalOrders,
     totalRevenue,
     pendingOrders,
-    avgOrderValue
+    avgOrderValue,
+    avgItemsPerOrder,
+    popularItems,
+    weekOverWeekGrowth,
+    thisWeekRevenue,
+    lastWeekRevenue
   };
+}
+
+function getStoreColor(index: number, opacity: number = 0.8) {
+  const hue = (166 + index * 30) % 360;
+  return `hsla(${hue}, 85%, 35%, ${opacity})`;
 }
 
 function calculateDailyOrderCounts(orders: Order[]) {
@@ -114,24 +174,50 @@ function calculateDailyOrderCounts(orders: Order[]) {
     return date;
   });
 
-  // Initialize counts for each day
-  const dailyCounts = days.map(date => ({
-    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    count: 0,
-    timestamp: date.getTime() // for sorting
-  }));
+  // Get unique items from all orders
+  const uniqueItems = new Set<string>();
+  orders.forEach(order => {
+    order.stores[0]?.items.forEach(item => {
+      uniqueItems.add(item.name);
+    });
+  });
 
-  // Count orders for each day
+  // Initialize counts for each day
+  const dailyCounts: DailyCount[] = days.map(date => {
+    const baseCount = {
+      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      timestamp: date.getTime()
+    };
+
+    // Add a count property for each unique item, initialized to 0
+    const itemCounts: { [key: string]: number } = {};
+    uniqueItems.forEach(itemName => {
+      itemCounts[itemName] = 0;
+    });
+
+    return {
+      ...baseCount,
+      ...itemCounts
+    };
+  });
+
+  // Count items for each day
   orders.forEach(order => {
     const orderDate = new Date(order.created);
     const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const dayData = dailyCounts.find(d => d.date === orderDateStr);
+    
     if (dayData) {
-      dayData.count++;
+      order.stores[0]?.items.forEach(item => {
+        dayData[item.name] = (dayData[item.name] as number || 0) + item.quantity;
+      });
     }
   });
 
-  return dailyCounts;
+  return {
+    data: dailyCounts,
+    items: Array.from(uniqueItems)
+  };
 }
 
 export default function StoreDashboard({ params }: { params: Promise<{ id: string }> }) {
@@ -144,6 +230,7 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState<string | null>(null);
   const [store, setStore] = useState<{ name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(Object.keys(statusLabels)));
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
 
@@ -205,13 +292,31 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
     fetchStore();
   }, [storeId]);
 
-  // Filter orders when status filter or search term changes
+  // Toggle status filter
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(status)) {
+        newSet.delete(status);
+      } else {
+        newSet.add(status);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/deselect all statuses
+  const toggleAll = (select: boolean) => {
+    setSelectedStatuses(new Set(select ? Object.keys(statusLabels) : []));
+  };
+
+  // Update filter effect
   useEffect(() => {
     let result = [...orders];
     
     // Apply status filter
-    if (statusFilter !== 'all') {
-      result = result.filter(order => order.status === statusFilter);
+    if (selectedStatuses.size < Object.keys(statusLabels).length) {
+      result = result.filter(order => selectedStatuses.has(order.status));
     }
     
     // Apply search filter (on order ID or customer name)
@@ -224,7 +329,7 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
     }
     
     setFilteredOrders(result);
-  }, [orders, statusFilter, searchTerm]);
+  }, [orders, selectedStatuses, searchTerm]);
 
   if (rolesLoading || loading) {
     return (
@@ -264,12 +369,23 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div>
               {store && (
-                <h1 className="text-4xl font-bold text-[#2D3748] mb-2">{store.name}</h1>
+                <Link href={`/store/${storeId}`}>
+                  <h1 className="text-4xl font-bold text-[#2D3748] mb-2 hover:text-[#2A9D8F] transition-colors">{store.name}</h1>
+                </Link>
               )}
-              <p className="text-lg text-[#4A5568]">Vendor Dashboard</p>
+              <div className="flex items-center gap-4">
+                <p className="text-lg text-[#4A5568]">Vendor Dashboard</p>
+                <Link
+                  href={`/store/${storeId}/inventory`}
+                  className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm flex items-center gap-1"
+                >
+                  <span>Manage Inventory</span>
+                  <ChartBarIcon className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
 
-            {/* Metrics Grid */}
+            {/* Key Metrics Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Pending Orders */}
               <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
@@ -318,13 +434,38 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* Orders Chart */}
-        <div className="mb-12">
+        {/* New Insights Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+          {/* Popular Items */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-[#2D3748] mb-4">Top Selling Items</h2>
+            <div className="divide-y divide-[#2A9D8F]/10">
+              {metrics.popularItems.map((item, index) => (
+                <div key={item.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-bold text-[#2A9D8F]">#{index + 1}</span>
+                      <div>
+                        <p className="font-medium text-[#2D3748]">{item.name}</p>
+                        <p className="text-sm text-[#4A5568]">{item.count} units sold</p>
+                      </div>
+                    </div>
+                    <p className="font-medium text-[#2D3748]">${item.revenue.toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Daily Orders Chart */}
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
             <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders (Last 30 Days)</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={calculateDailyOrderCounts(orders)} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                <BarChart 
+                  data={calculateDailyOrderCounts(orders).data} 
+                  margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                >
                   <XAxis 
                     dataKey="date" 
                     angle={-45}
@@ -344,50 +485,94 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
                       borderRadius: '0.5rem'
                     }}
                     cursor={{ fill: 'rgba(42, 157, 143, 0.1)' }}
-                    labelFormatter={(label) => `Orders on ${label}`}
                   />
-                  <Bar 
-                    dataKey="count" 
-                    fill="#2A9D8F"
-                    radius={[4, 4, 0, 0]}
-                    name="Orders"
-                  />
+                  <Legend />
+                  {calculateDailyOrderCounts(orders).items.map((itemName, index) => (
+                    <Bar 
+                      key={itemName}
+                      dataKey={itemName}
+                      name={itemName}
+                      stackId="items"
+                      fill={getStoreColor(index)}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
+        {/* Orders Table Title */}
+        <h2 className="text-2xl font-bold text-[#2D3748] mb-6">All Orders</h2>
+
         {/* Filters Section */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <h2 className="text-2xl font-bold text-[#2D3748]">Orders</h2>
-          <div className="flex-1 flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 max-w-xs">
-              <input
-                type="text"
-                placeholder="Search orders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-[#2A9D8F]/20 bg-white focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent"
-              />
+        <div className="mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-6">
+              {/* Status Filter */}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-[#2D3748]">Filter by Status</h3>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => toggleAll(true)}
+                      className="text-xs text-[#2A9D8F] hover:text-[#40B4A6] transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={() => toggleAll(false)}
+                      className="text-xs text-[#2A9D8F] hover:text-[#40B4A6] transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <label
+                      key={value}
+                      className={`
+                        flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all
+                        ${selectedStatuses.has(value) 
+                          ? 'border-[#2A9D8F] bg-[#2A9D8F]/5 text-[#2D3748]' 
+                          : 'border-[#2A9D8F]/20 bg-white/50 text-[#4A5568]'
+                        }
+                        hover:border-[#2A9D8F] hover:bg-[#2A9D8F]/5
+                      `}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedStatuses.has(value)}
+                        onChange={() => toggleStatus(value)}
+                        className="h-4 w-4 rounded border-[#2A9D8F]/20 text-[#2A9D8F] focus:ring-[#2A9D8F]"
+                      />
+                      <span className="text-sm whitespace-nowrap">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="sm:w-72">
+                <h3 className="text-sm font-medium text-[#2D3748] mb-3">Search Orders</h3>
+                <input
+                  type="text"
+                  placeholder="Search by order ID or customer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-[#2A9D8F]/20 bg-white focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent"
+                />
+              </div>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-[#2A9D8F]/20 bg-white focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent"
-            >
-              <option value="all">All Statuses</option>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
           </div>
         </div>
         
         {/* Results Summary */}
         <div className="mb-4 text-sm text-[#4A5568]">
           Showing {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
-          {statusFilter !== 'all' && ` with status "${statusLabels[statusFilter as keyof typeof statusLabels]}"`}
+          {selectedStatuses.size < Object.keys(statusLabels).length && 
+            ` with status${selectedStatuses.size === 1 ? '' : 'es'}: ${Array.from(selectedStatuses).map(s => statusLabels[s as keyof typeof statusLabels]).join(', ')}`}
           {searchTerm && ` matching "${searchTerm}"`}
         </div>
 

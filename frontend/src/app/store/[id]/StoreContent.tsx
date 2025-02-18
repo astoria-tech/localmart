@@ -5,7 +5,7 @@ import { useCart } from '../../contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
-import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon } from '@heroicons/react/24/outline';
 import { config } from '@/config';
 import { useStoreRoles } from '@/app/hooks/useStoreRoles';
 import Link from 'next/link';
@@ -117,14 +117,24 @@ export default function StoreContent({ storeId }: { storeId: string }) {
               <div className="relative z-10">
                 <h1 className="text-2xl font-bold text-[#2D3748]">{store.name}</h1>
                 <p className="text-[#4A5568] text-sm">Local market & grocery</p>
-                {/* Add dashboard link for store admins */}
+                {/* Vendor Links */}
                 {isAdmin && (
-                  <Link
-                    href={`/store/${storeId}/dashboard`}
-                    className="inline-flex items-center mt-2 text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors"
-                  >
-                    View Dashboard
-                  </Link>
+                  <div className="flex items-center gap-4 mt-2">
+                    <Link
+                      href={`/store/${storeId}/dashboard`}
+                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1"
+                    >
+                      <ChartBarIcon className="w-4 h-4" />
+                      <span>View Orders</span>
+                    </Link>
+                    <Link
+                      href={`/store/${storeId}/inventory`}
+                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1"
+                    >
+                      <ShoppingBagIcon className="w-4 h-4" />
+                      <span>Manage Inventory</span>
+                    </Link>
+                  </div>
                 )}
                 {/* Social Links */}
                 <div className="flex gap-3 mt-3">
