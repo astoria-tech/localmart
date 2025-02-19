@@ -84,7 +84,7 @@ export default function Page() {
               <h1 className="text-4xl font-bold text-[#2D3748] font-display">localmart</h1>
             </div>
             <p className="text-lg text-[#4A5568]">
-              Shop from your favorite local stores with same-day delivery
+              Shop local, same-day delivery.
             </p>
             <SearchProvider>
                 { productSearchEnabled && <Search />}
