@@ -324,22 +324,92 @@ async def create_order(request: Dict):
         )
 
 @app.get("/api/v0/orders", response_model=List[Dict])
+async def get_all_orders(request: Request):
+    """Get all orders (admin only)"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+
+    # Verify user is admin
+    user = pb_service.get_user_from_token(token)
+    if not 'admin' in (getattr(user, 'roles', []) or []):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with user_auth_context(token):
+        # Get all orders
+        orders = pb_service.get_list(
+            'orders',
+            query_params={
+                "sort": "-created",
+                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store"
+            }
+        )
+
+        # Format orders for response
+        formatted_orders = []
+        for order in orders.items:
+            # Group items by store
+            stores_dict = {}
+
+            # Get all order items for this order
+            order_items = order.expand.get('order_items_via_order', [])
+
+            for item in order_items:
+                if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                    continue
+
+                store_item = item.expand['store_item']
+                if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                    continue
+
+                store = store_item.expand['store']
+                store_id = store.id
+
+                if store_id not in stores_dict:
+                    stores_dict[store_id] = {
+                        'store': {
+                            'id': store.id,
+                            'name': store.name
+                        },
+                        'items': []
+                    }
+
+                stores_dict[store_id]['items'].append({
+                    'id': item.id,
+                    'name': store_item.name,
+                    'quantity': item.quantity,
+                    'price': item.price_at_time
+                })
+
+            delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
+
+            formatted_order = {
+                'id': order.id,
+                'created': order.created,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'delivery_fee': order.delivery_fee,
+                'total_amount': order.total_amount,
+                'tax_amount': order.tax_amount,
+                'delivery_address': delivery_address,
+                'stores': list(stores_dict.values())
+            }
+            formatted_orders.append(formatted_order)
+
+        return formatted_orders
+
+@app.get("/api/v0/user/orders", response_model=List[Dict])
 async def get_user_orders(request: Request):
     """Get orders for the authenticated user"""
     token = get_token_from_request(request)
     decoded_token = decode_jwt(token)
     user_id = decoded_token['id']
 
-    # if user is admin, then filter by user, otherwise don't
-    user = pb_service.get_user_from_token(token)
-    is_admin = 'admin' in (getattr(user, 'roles', []) or [])
-
     with user_auth_context(token):
         # Get user's orders
         orders = pb_service.get_list(
             'orders',
             query_params={
-                "filter": f'user = "{user_id}"' if not is_admin else '',
+                "filter": f'user = "{user_id}"',
                 "sort": "-created",
                 "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store"
             }

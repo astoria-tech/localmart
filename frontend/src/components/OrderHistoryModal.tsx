@@ -1,10 +1,13 @@
 'use client';
 
 import { Dialog, Transition } from '@headlessui/react'
-import { Fragment } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { formatCurrency } from '@/utils/currency'
 import { ClockIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/app/contexts/auth'
+import { toast } from 'react-hot-toast'
+import { config } from '@/config'
 
 const formatDateTime = (isoString: string) => {
   // Parse the UTC time string and create a Date object
@@ -59,6 +62,39 @@ interface OrderHistoryModalProps {
 
 export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHistoryModalProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user?.token) return;
+
+      try {
+        const response = await fetch(`${config.apiUrl}/api/v0/user/orders`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch orders');
+        }
+
+        const data = await response.json();
+        setUserOrders(data);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        toast.error('Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isOpen && user) {
+      fetchOrders();
+    }
+  }, [isOpen, user]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -148,58 +184,68 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
                   Order History
                 </Dialog.Title>
 
-                <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div
-                      key={order.id}
-                      onClick={() => handleOrderClick(order.id)}
-                      className="bg-white/80 backdrop-blur-sm rounded-lg p-6 hover:shadow-md transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-[#2D3748]">Order #{order.id.slice(-6)}</p>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
-                            >
-                              {getStatusLabel(order.status)}
-                            </span>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}
-                            >
-                              {getPaymentStatusLabel(order.payment_status)}
-                            </span>
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-32 bg-white/50 rounded-lg"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {userOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        onClick={() => handleOrderClick(order.id)}
+                        className="bg-white/80 backdrop-blur-sm rounded-lg p-6 hover:shadow-md transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-[#2D3748]">Order #{order.id.slice(-6)}</p>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                              >
+                                {getStatusLabel(order.status)}
+                              </span>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}
+                              >
+                                {getPaymentStatusLabel(order.payment_status)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-[#4A5568]">
+                              <ClockIcon className="w-4 h-4" />
+                              <time dateTime={order.created}>
+                                {formatDateTime(order.created)}
+                              </time>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1 text-sm text-[#4A5568]">
-                            <ClockIcon className="w-4 h-4" />
-                            <time dateTime={order.created}>
-                              {formatDateTime(order.created)}
-                            </time>
+                          <div className="text-right">
+                            <p className="text-sm text-[#4A5568]">Total</p>
+                            <p className="font-medium text-[#2D3748]">{formatCurrency(order.total_amount)}</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-[#4A5568]">Total</p>
-                          <p className="font-medium text-[#2D3748]">{formatCurrency(order.total_amount)}</p>
+                        <div className="mt-2 text-sm text-[#4A5568]">
+                          {order.stores.map((store) => (
+                            <div key={store.store.id} className="flex items-center gap-1">
+                              <span className="font-medium">{store.store.name}</span>
+                              <span>•</span>
+                              <span>{store.items.length} {store.items.length === 1 ? 'item' : 'items'}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <div className="mt-2 text-sm text-[#4A5568]">
-                        {order.stores.map((store) => (
-                          <div key={store.store.id} className="flex items-center gap-1">
-                            <span className="font-medium">{store.store.name}</span>
-                            <span>•</span>
-                            <span>{store.items.length} {store.items.length === 1 ? 'item' : 'items'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  {orders.length === 0 && (
-                    <div className="text-center py-8 text-[#4A5568]">
-                      <p>No orders found</p>
-                    </div>
-                  )}
-                </div>
+                    {userOrders.length === 0 && (
+                      <div className="text-center py-8 text-[#4A5568]">
+                        <p>No orders found</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-6">
                   <button
