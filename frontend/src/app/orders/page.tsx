@@ -59,7 +59,7 @@ const statusColors = {
 };
 
 const statusLabels = {
-  pending: 'Pending',
+  pending: 'Delivery Pending',
   confirmed: 'Confirmed',
   picked_up: 'Picked Up',
   delivered: 'Delivered',

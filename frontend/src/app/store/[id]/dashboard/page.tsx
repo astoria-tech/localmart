@@ -60,8 +60,8 @@ const statusColors = {
 };
 
 const statusLabels = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
+  pending: 'Pickup Pending',
+  confirmed: 'Pickup Confirmed',
   picked_up: 'Picked Up',
   delivered: 'Delivered',
   cancelled: 'Cancelled'
