@@ -33,14 +33,14 @@ interface Order {
   payment_status: string;
   delivery_fee: number;
   total_amount: number;
-  customer_name: string;
-  customer_phone?: string;
   delivery_address: {
     street_address: string[];
     city: string;
     state: string;
     zip_code: string;
     country: string;
+    customer_name: string;
+    customer_phone?: string;
   } | null;
   stores: Store[];
 }
@@ -214,6 +214,9 @@ function calculateDailyOrderCounts(orders: Order[]) {
     }
   });
 
+  // Sort dailyCounts by timestamp to ensure chronological order
+  dailyCounts.sort((a, b) => a.timestamp - b.timestamp);
+
   return {
     data: dailyCounts,
     items: Array.from(uniqueItems)
@@ -324,7 +327,7 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
       const lowercaseSearch = searchTerm.toLowerCase();
       result = result.filter(order => 
         order.id.toLowerCase().includes(lowercaseSearch) ||
-        order.customer_name.toLowerCase().includes(lowercaseSearch)
+        order.delivery_address?.customer_name.toLowerCase().includes(lowercaseSearch)
       );
     }
     
@@ -620,10 +623,10 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
                     {formatDateTime(order.created)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                    {order.customer_name}
+                    {order.delivery_address?.customer_name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                    {order.customer_phone || '-'}
+                    {order.delivery_address?.customer_phone || '-'}
                   </td>
                   <td className="px-6 py-4 text-sm text-[#4A5568]">
                     {order.delivery_address ? (

@@ -227,7 +227,8 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       toast.success('Order placed successfully!');
       clearCart();
       onClose();
-      router.push('/orders');
+      // Instead of redirecting, trigger the order history modal to open
+      document.dispatchEvent(new Event('openOrderHistory'));
     } catch (error) {
       console.error('Error creating order:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create order');

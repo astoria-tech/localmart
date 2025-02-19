@@ -288,7 +288,11 @@ async def create_order(request: Dict):
                 'tax_amount': request['tax_amount'],
                 'delivery_fee': request['delivery_fee'],
                 'total_amount': request['total_amount'],
-                'delivery_address': request['delivery_address'],
+                'delivery_address': {
+                    **request['delivery_address'],
+                    'customer_name': f"{user.first_name} {user.last_name}".strip(),
+                    'customer_phone': getattr(user, 'phone_number', None)
+                },
                 'customer_notes': request.get('customer_notes', ''),
             })
 
@@ -337,7 +341,7 @@ async def get_user_orders(request: Request):
             query_params={
                 "filter": f'user = "{user_id}"' if not is_admin else '',
                 "sort": "-created",
-                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store,user"
+                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store"
             }
         )
 
@@ -377,9 +381,6 @@ async def get_user_orders(request: Request):
                     'price': item.price_at_time
                 })
 
-            user = order.expand.get('user', {})
-            customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
-            
             delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
 
             formatted_order = {
@@ -390,8 +391,6 @@ async def get_user_orders(request: Request):
                 'delivery_fee': order.delivery_fee,
                 'total_amount': order.total_amount,
                 'tax_amount': order.tax_amount,
-                'customer_name': customer_name,
-                'customer_phone': getattr(user, 'phone_number', None),
                 'delivery_address': delivery_address,
                 'stores': list(stores_dict.values())
             }
@@ -911,7 +910,7 @@ async def get_store_orders(store_id: str, request: Request):
                 'orders',
                 query_params={
                     "sort": "-created",
-                    "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store,user",
+                    "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store",
                     "filter": f'order_items_via_order.store_item.store = "{store_id}"'
                 }
             )
@@ -949,9 +948,6 @@ async def get_store_orders(store_id: str, request: Request):
                         'price': item.price_at_time
                     })
 
-                user = order.expand.get('user', {})
-                customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
-                
                 delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
 
                 formatted_order = {
@@ -962,8 +958,6 @@ async def get_store_orders(store_id: str, request: Request):
                     'delivery_fee': order.delivery_fee,
                     'total_amount': order.total_amount,
                     'tax_amount': order.tax_amount,
-                    'customer_name': customer_name,
-                    'customer_phone': getattr(user, 'phone_number', None),
                     'delivery_address': delivery_address,
                     'stores': list(stores_dict.values())
                 }

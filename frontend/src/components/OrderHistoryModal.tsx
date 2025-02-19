@@ -1,9 +1,9 @@
 'use client';
 
-import { Dialog, Transition } from '@headlessui/react'
+import { Dialog, Transition, Disclosure } from '@headlessui/react'
 import { Fragment } from 'react'
 import { formatCurrency } from '@/utils/currency'
-import { ClockIcon, MapPinIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
+import { ClockIcon, MapPinIcon, BuildingStorefrontIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 
 const formatDateTime = (isoString: string) => {
   // Parse the UTC time string and create a Date object
@@ -140,100 +140,109 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
                   Order History
                 </Dialog.Title>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {orders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="bg-white/80 backdrop-blur-sm rounded-lg p-6 hover:shadow-md transition-shadow"
-                    >
-                      {/* Order Header */}
-                      <div className="flex justify-between items-start border-b border-[#2A9D8F]/10 pb-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-[#2D3748]">Order #{order.id.slice(-6)}</p>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
-                            >
-                              {getStatusLabel(order.status)}
-                            </span>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}
-                            >
-                              {getPaymentStatusLabel(order.payment_status)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-sm text-[#4A5568]">
-                            <ClockIcon className="w-4 h-4" />
-                            <time dateTime={order.created}>
-                              {formatDateTime(order.created)}
-                            </time>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Delivery Address Section */}
-                      <div className="mb-4">
-                        <h4 className="font-medium text-[#2D3748] mb-2">Delivery Address</h4>
-                        <div className="flex items-start gap-2 text-sm text-[#4A5568]">
-                          <MapPinIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          <div>
-                            {order.delivery_address ? (
-                              <>
-                                <p>{order.delivery_address.street_address.filter(Boolean).join(', ')}</p>
-                                <p>{order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}</p>
-                              </>
-                            ) : (
-                              <p className="italic">No address available</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Order Items by Store */}
-                      <div className="space-y-4 border-t border-[#2A9D8F]/10 pt-4">
-                        {order.stores.map((store) => (
-                          <div key={store.store.id}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <BuildingStorefrontIcon className="w-4 h-4 text-[#2A9D8F]" />
-                              <h4 className="font-medium text-[#2D3748]">{store.store.name}</h4>
+                    <Disclosure key={order.id}>
+                      {({ open }) => (
+                        <div className="bg-white/80 backdrop-blur-sm rounded-lg hover:shadow-md transition-shadow">
+                          <Disclosure.Button className="w-full px-6 py-4 flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-[#2D3748]">Order #{order.id.slice(-6)}</p>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                                >
+                                  {getStatusLabel(order.status)}
+                                </span>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}
+                                >
+                                  {getPaymentStatusLabel(order.payment_status)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-sm text-[#4A5568]">
+                                <ClockIcon className="w-4 h-4" />
+                                <time dateTime={order.created}>
+                                  {formatDateTime(order.created)}
+                                </time>
+                              </div>
                             </div>
-                            <div className="bg-white/50 rounded-lg p-3">
-                              {store.items.map((item) => (
-                                <div key={item.id} className="flex justify-between py-1 text-sm">
-                                  <div className="flex gap-2">
-                                    <span className="text-[#4A5568] font-medium">{item.quantity}×</span>
-                                    <span className="text-[#2D3748]">{item.name}</span>
+                            <ChevronUpIcon
+                              className={`${
+                                open ? 'rotate-180 transform' : ''
+                              } h-5 w-5 text-[#2A9D8F]`}
+                            />
+                          </Disclosure.Button>
+                          
+                          <Disclosure.Panel className="px-6 pb-4">
+                            <div className="border-t border-[#2A9D8F]/10 pt-4">
+                              {/* Delivery Address Section */}
+                              <div className="mb-4">
+                                <h4 className="font-medium text-[#2D3748] mb-2">Delivery Address</h4>
+                                <div className="flex items-start gap-2 text-sm text-[#4A5568]">
+                                  <MapPinIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    {order.delivery_address ? (
+                                      <>
+                                        <p>{order.delivery_address.street_address.filter(Boolean).join(', ')}</p>
+                                        <p>{order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}</p>
+                                      </>
+                                    ) : (
+                                      <p className="italic">No address available</p>
+                                    )}
                                   </div>
-                                  <span className="text-[#4A5568]">{formatCurrency(item.price * item.quantity)}</span>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                              </div>
 
-                      {/* Price Breakdown */}
-                      <div className="mt-4 space-y-2 text-sm border-t border-[#2A9D8F]/10 pt-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#4A5568]">Subtotal</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.stores.reduce((acc, store) => 
-                            acc + store.items.reduce((itemAcc, item) => itemAcc + (item.price * item.quantity), 0), 0
-                          ))}</span>
+                              {/* Order Items by Store */}
+                              <div className="space-y-4">
+                                {order.stores.map((store) => (
+                                  <div key={store.store.id}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <BuildingStorefrontIcon className="w-4 h-4 text-[#2A9D8F]" />
+                                      <h4 className="font-medium text-[#2D3748]">{store.store.name}</h4>
+                                    </div>
+                                    <div className="bg-white/50 rounded-lg p-3">
+                                      {store.items.map((item) => (
+                                        <div key={item.id} className="flex justify-between py-1 text-sm">
+                                          <div className="flex gap-2">
+                                            <span className="text-[#4A5568] font-medium">{item.quantity}×</span>
+                                            <span className="text-[#2D3748]">{item.name}</span>
+                                          </div>
+                                          <span className="text-[#4A5568]">{formatCurrency(item.price * item.quantity)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Price Breakdown */}
+                              <div className="mt-4 space-y-2 text-sm border-t border-[#2A9D8F]/10 pt-4">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[#4A5568]">Subtotal</span>
+                                  <span className="text-[#2D3748]">{formatCurrency(order.stores.reduce((acc, store) => 
+                                    acc + store.items.reduce((itemAcc, item) => itemAcc + (item.price * item.quantity), 0), 0
+                                  ))}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[#4A5568]">Tax</span>
+                                  <span className="text-[#2D3748]">{formatCurrency(order.tax_amount || 0)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[#4A5568]">Delivery Fee</span>
+                                  <span className="text-[#2D3748]">{formatCurrency(order.delivery_fee)}</span>
+                                </div>
+                                <div className="flex justify-between items-center pt-2 border-t border-[#2A9D8F]/10 font-medium">
+                                  <span className="text-[#2D3748]">Total</span>
+                                  <span className="text-[#2D3748]">{formatCurrency(order.total_amount)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </Disclosure.Panel>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#4A5568]">Tax</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.tax_amount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#4A5568]">Delivery Fee</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.delivery_fee)}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-2 border-t border-[#2A9D8F]/10 font-medium">
-                          <span className="text-[#2D3748]">Total</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.total_amount)}</span>
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </Disclosure>
                   ))}
 
                   {orders.length === 0 && (

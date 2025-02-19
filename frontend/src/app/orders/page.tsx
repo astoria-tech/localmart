@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { config } from '@/config';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useRouter } from 'next/navigation';
 
 interface OrderItem {
   id: string;
@@ -25,14 +26,14 @@ interface Order {
   payment_status: string;
   delivery_fee: number;
   total_amount: number;
-  customer_name: string;
-  customer_phone?: string;
   delivery_address: {
     street_address: string[];
     city: string;
     state: string;
     zip_code: string;
     country: string;
+    customer_name: string;
+    customer_phone?: string;
   } | null;
   stores: Array<{
     store: {
@@ -188,6 +189,7 @@ export default function OrdersDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(Object.keys(statusLabels)));
   const [searchTerm, setSearchTerm] = useState('');
+  const router = useRouter();
 
   const metrics = calculateMetrics(orders);
 
@@ -197,7 +199,7 @@ export default function OrdersDashboard() {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
       order.id.toLowerCase().includes(searchLower) ||
-      order.customer_name.toLowerCase().includes(searchLower);
+      order.delivery_address?.customer_name.toLowerCase().includes(searchLower);
     return matchesStatus && matchesSearch;
   });
 
@@ -219,9 +221,25 @@ export default function OrdersDashboard() {
     setSelectedStatuses(new Set(select ? Object.keys(statusLabels) : []));
   };
 
+  // Check for global admin access
+  useEffect(() => {
+    if (!loading && user) {
+      const isGlobalAdmin = user.roles?.includes('admin');
+      if (!isGlobalAdmin) {
+        router.push('/');
+        toast.error("You don't have permission to access this page");
+      }
+    }
+  }, [loading, user, router]);
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
+        // Only fetch if user is a global admin
+        if (!user?.roles?.includes('admin')) {
+          return;
+        }
+
         const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
           headers: {
             'Authorization': `Bearer ${user?.token}`,
@@ -537,10 +555,10 @@ export default function OrdersDashboard() {
                       {formatDateTime(order.created)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                      {order.customer_name}
+                      {order.delivery_address?.customer_name || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                      {order.customer_phone || '-'}
+                      {order.delivery_address?.customer_phone || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-[#4A5568]">
                       {order.delivery_address ? (
