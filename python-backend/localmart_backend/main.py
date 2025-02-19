@@ -1003,38 +1003,32 @@ async def create_store_item(store_id: str, item: StoreItem, request: Request):
 
 @app.patch("/api/v0/stores/{store_id}/items/{item_id}", response_model=Dict)
 async def update_store_item(store_id: str, item_id: str, item: StoreItem, request: Request):
-    try:
-        token = get_token_from_request(request)
-        with user_auth_context(token) as user:
-            # Check if user has admin role for the store or is a global admin
-            if not 'admin' in user.roles:
-                store_roles = pb_service.pb.collection('store_roles').get_list(
-                    1, 1, 
-                    query_params={
-                        "filter": f'user="{user.id}" && store="{store_id}" && role="admin"'
-                    }
-                )
-                if not store_roles.items:
-                    raise HTTPException(status_code=403, detail="Not authorized to manage store items")
+    token = get_token_from_request(request)
+    with user_auth_context(token) as user:
+        # Check if user has admin role for the store or is a global admin
+        if not 'admin' in user.roles:
+            store_roles = pb_service.pb.collection('store_roles').get_list(
+                1, 1, 
+                query_params={
+                    "filter": f'user="{user.id}" && store="{store_id}" && role="admin"'
+                }
+            )
+            if not store_roles.items:
+                raise HTTPException(status_code=403, detail="Not authorized to manage store items")
 
-            # Verify item belongs to store
-            existing_item = pb_service.pb.collection('store_items').get_one(item_id)
-            if existing_item.store != store_id:
-                raise HTTPException(status_code=404, detail="Item not found in store")
+        # Verify item belongs to store
+        existing_item = pb_service.pb.collection('store_items').get_one(item_id)
+        if existing_item.store != store_id:
+            raise HTTPException(status_code=404, detail="Item not found in store")
 
-            # Update the item
-            updated_item = pb_service.pb.collection('store_items').update(item_id, {
-                'name': item.name,
-                'price': item.price,
-                'description': item.description
-            })
+        # Update the item
+        updated_item = pb_service.pb.collection('store_items').update(item_id, {
+            'name': item.name,
+            'price': item.price,
+            'description': item.description
+        })
 
-            return serialize_store_item(updated_item)
-    except Exception as e:
-        logger.error(f"Error updating store item: {str(e)}")
-        logger.error(f"Store ID: {store_id}, Item ID: {item_id}")
-        logger.error(f"Request data: {item.dict() if item else 'No item data'}")
-        raise HTTPException(status_code=400, detail=str(e))
+        return serialize_store_item(updated_item)
 
 @app.delete("/api/v0/stores/{store_id}/items/{item_id}")
 async def delete_store_item(store_id: str, item_id: str, request: Request):
