@@ -129,15 +129,41 @@ export default function Page() {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
-      <div className="bg-gradient-to-b from-[#2A9D8F]/10 to-transparent pt-36 pb-14">
-        <div className="container mx-auto px-4">
+      <div className="bg-gradient-to-b from-[#2A9D8F]/20 to-transparent pt-36 pb-14 relative overflow-hidden">
+        {/* Decorative Background Pattern */}
+        <div className="absolute inset-0 opacity-[0.15]" style={{ 
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232A9D8F' fill-rule='evenodd'%3E%3Cg fill-rule='nonzero'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundSize: '52px 26px'
+        }} />
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#2A9D8F]/10 via-transparent to-[#2A9D8F]/5" />
+        
+        <div className="container mx-auto px-4 relative">
           <div className="flex justify-between items-start">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-6">
-                <BuildingStorefrontIcon className="h-14 w-14 text-[#2A9D8F]" />
+            {/* Region Select */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-5 shadow-lg ring-1 ring-[#2A9D8F]/20">
+              <label htmlFor="region-select" className="block text-base font-semibold text-[#2D3748] mb-2.5">
+                Neighborhood
+              </label>
+              <select
+                id="region-select"
+                className="w-56 rounded-lg border-2 border-[#2A9D8F]/30 bg-white py-2.5 px-4 text-base shadow-sm 
+                  focus:border-[#2A9D8F] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/20 
+                  text-[#2D3748] font-medium hover:border-[#2A9D8F]/50 transition-colors"
+                defaultValue="astoria"
+              >
+                <option value="astoria">Astoria</option>
+              </select>
+            </div>
+
+            {/* Main Hero Content */}
+            <div className="max-w-xl text-right">
+              <div className="flex items-center justify-end gap-3 mb-6">
                 <h1 className="text-5xl font-bold text-[#2D3748] font-display">localmart</h1>
+                <BuildingStorefrontIcon className="h-14 w-14 text-[#2A9D8F]" />
               </div>
-              <p className="text-xl text-[#4A5568] mb-10 max-w-2xl leading-relaxed">
+              <p className="text-xl text-[#4A5568] mb-10 leading-relaxed">
                 Shop local. Same-day delivery.
                 <br />
                 From your favorite neighborhood stores.
@@ -146,26 +172,12 @@ export default function Page() {
                 {productSearchEnabled && <Search />}
               </SearchProvider>
             </div>
-
-            {/* Region Select */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm ring-1 ring-black/5">
-              <label htmlFor="region-select" className="block text-sm font-medium text-[#4A5568] mb-2">
-                Neighborhood
-              </label>
-              <select
-                id="region-select"
-                className="w-48 rounded-lg border border-[#2A9D8F]/20 bg-white py-2 px-3 shadow-sm focus:border-[#2A9D8F] focus:outline-none focus:ring-1 focus:ring-[#2A9D8F] text-[#2D3748] font-medium"
-                defaultValue="astoria"
-              >
-                <option value="astoria">Astoria</option>
-              </select>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content Container */}
-      <div className="container mx-auto px-4 -mt-4">
+      <div className="container mx-auto px-4 -mt-8">
         {/* Local Stores Section - Commented Out
         <div className="bg-[#FFFFFF]/90 backdrop-blur-sm rounded-2xl shadow-sm ring-1 ring-black/5 p-8 mb-8">
           <h2 className="text-3xl font-bold text-[#2D3748] mb-8">Local Stores</h2>
