@@ -131,19 +131,35 @@ export default function Page() {
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-[#2A9D8F]/10 to-transparent pt-36 pb-14">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <BuildingStorefrontIcon className="h-14 w-14 text-[#2A9D8F]" />
-              <h1 className="text-5xl font-bold text-[#2D3748] font-display">localmart</h1>
+          <div className="flex justify-between items-start">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-6">
+                <BuildingStorefrontIcon className="h-14 w-14 text-[#2A9D8F]" />
+                <h1 className="text-5xl font-bold text-[#2D3748] font-display">localmart</h1>
+              </div>
+              <p className="text-xl text-[#4A5568] mb-10 max-w-2xl leading-relaxed">
+                Shop local. Same-day delivery.
+                <br />
+                From your favorite neighborhood stores.
+              </p>
+              <SearchProvider>
+                {productSearchEnabled && <Search />}
+              </SearchProvider>
             </div>
-            <p className="text-xl text-[#4A5568] mb-10 max-w-2xl mx-auto leading-relaxed">
-              Shop local. Same-day delivery.
-              <br />
-              From your favorite neighborhood stores.
-            </p>
-            <SearchProvider>
-              {productSearchEnabled && <Search />}
-            </SearchProvider>
+
+            {/* Region Select */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm ring-1 ring-black/5">
+              <label htmlFor="region-select" className="block text-sm font-medium text-[#4A5568] mb-2">
+                Neighborhood
+              </label>
+              <select
+                id="region-select"
+                className="w-48 rounded-lg border border-[#2A9D8F]/20 bg-white py-2 px-3 shadow-sm focus:border-[#2A9D8F] focus:outline-none focus:ring-1 focus:ring-[#2A9D8F] text-[#2D3748] font-medium"
+                defaultValue="astoria"
+              >
+                <option value="astoria">Astoria</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
