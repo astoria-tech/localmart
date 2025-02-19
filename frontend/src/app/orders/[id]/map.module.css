@@ -1,0 +1,57 @@
+/* Fix for Leaflet default marker icons */
+.leafletContainer {
+  z-index: 0;
+}
+
+.leafletContainer :global(.leaflet-div-icon) {
+  background: transparent;
+  border: none;
+}
+
+/* Custom marker styling */
+.marker {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #2A9D8F;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.marker svg {
+  width: 14px;
+  height: 14px;
+  color: #2A9D8F;
+}
+
+/* Popup styling */
+.leafletContainer :global(.leaflet-popup-content-wrapper) {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.leafletContainer :global(.leaflet-popup-tip) {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.leafletContainer :global(.leaflet-popup-content) {
+  margin: 8px 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #2D3748;
+}
+
+/* Ensure popups appear above the order panel */
+.leafletContainer :global(.leaflet-popup) {
+  z-index: 1000;
+}
+
+/* Ensure controls appear above the order panel */
+.leafletContainer :global(.leaflet-control) {
+  z-index: 1000;
+} 
