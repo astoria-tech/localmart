@@ -219,63 +219,65 @@ export default function Page() {
         */}
 
         {/* Popular Items Sections */}
-        {stores.map((store, storeIndex) => store.items && store.items.length > 0 && (
-          <div key={store.id} className="bg-[#FAF9F6]/80 backdrop-blur-sm rounded-2xl shadow-sm ring-1 ring-black/5 p-8 mb-8">
-            <div className="flex items-center justify-between mb-8">
-              <Link
-                href={`/store/${store.id}`}
-                className="group"
-              >
-                <h2 className="text-2xl font-bold text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors">{store.name}</h2>
-              </Link>
-              <Link
-                href={`/store/${store.id}`}
-                className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm font-medium flex items-center gap-1 group"
-              >
-                See all
-                <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
-              {store.items.slice(0, 6).map((item) => (
-                <div
-                  key={item.id}
-                  className="group relative bg-[#FFFFFF]/95 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ring-1 ring-black/5 hover:ring-[#2A9D8F]/10"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {stores.map((store, storeIndex) => store.items && store.items.length > 0 && (
+            <div key={store.id} className="bg-[#FAF9F6]/80 backdrop-blur-sm rounded-2xl shadow-sm ring-1 ring-black/5 p-8">
+              <div className="flex items-center justify-between mb-8">
+                <Link
+                  href={`/store/${store.id}`}
+                  className="group"
                 >
-                  <Link href={`/store/${store.id}`}>
-                    <div className="aspect-w-4 aspect-h-3">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
-                      />
-                    </div>
-                  </Link>
-                  <div className="p-4">
+                  <h2 className="text-2xl font-bold text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors">{store.name}</h2>
+                </Link>
+                <Link
+                  href={`/store/${store.id}`}
+                  className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm font-medium flex items-center gap-1 group"
+                >
+                  See all
+                  <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                {store.items.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    className="group relative bg-[#FFFFFF]/95 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ring-1 ring-black/5 hover:ring-[#2A9D8F]/10"
+                  >
                     <Link href={`/store/${store.id}`}>
-                      <h3 className="text-sm font-semibold text-[#2D3748] mb-1 group-hover:text-[#2A9D8F] transition-colors line-clamp-2">
-                        {item.name}
-                      </h3>
+                      <div className="aspect-w-4 aspect-h-3">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
+                        />
+                      </div>
                     </Link>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-[#4A5568] font-medium">${item.price.toFixed(2)}</p>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleAddToCart(store.id, item);
-                        }}
-                        className="p-2 text-[#2A9D8F] hover:text-white hover:bg-[#2A9D8F] rounded-full transition-colors group/btn"
-                        aria-label={`Add ${item.name} to cart`}
-                      >
-                        <PlusIcon className="w-5 h-5" />
-                      </button>
+                    <div className="p-4">
+                      <Link href={`/store/${store.id}`}>
+                        <h3 className="text-sm font-semibold text-[#2D3748] mb-1 group-hover:text-[#2A9D8F] transition-colors line-clamp-2">
+                          {item.name}
+                        </h3>
+                      </Link>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-[#4A5568] font-medium">${item.price.toFixed(2)}</p>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleAddToCart(store.id, item);
+                          }}
+                          className="p-2 text-[#2A9D8F] hover:text-white hover:bg-[#2A9D8F] rounded-full transition-colors group/btn"
+                          aria-label={`Add ${item.name} to cart`}
+                        >
+                          <PlusIcon className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </main>
   );
