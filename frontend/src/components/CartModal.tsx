@@ -7,6 +7,7 @@ import { useCart } from '@/app/contexts/cart';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
 import { config } from '@/config';
+import { useRouter } from 'next/navigation';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ interface SavedCard {
 export default function CartModal({ isOpen, onClose }: CartModalProps) {
   const { items, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
+  const router = useRouter();
   const [store, setStore] = useState<Store | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
@@ -159,35 +161,30 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
   };
 
   const handleCheckout = async () => {
-    if (!user || !store || !selectedCardId || !orderSummary) {
-      return;
-    }
+    if (!user || !store || !selectedCardId || !orderSummary) return;
 
     setIsCheckingOut(true);
-
     try {
-      // Create order payload
-      const orderData = {
-        user_id: user.id,
-        store_id: store.id,
-        items: items.map(item => ({
-          store_item_id: item.id,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        subtotal_amount: orderSummary.subtotalAmount,
-        tax_amount: orderSummary.taxAmount,
-        delivery_fee: orderSummary.deliveryFee,
-        total_amount: orderSummary.totalAmount,
-        payment_method_id: selectedCardId,
-        delivery_address: {
-          street_address: ["123 Main St"], // TODO: Get from user input
-          city: "New York",
-          state: "NY",
-          zip_code: "10001"
-        },
-        customer_notes: "" // TODO: Add notes field if needed
-      };
+      // Get user's profile for delivery address
+      const profileResponse = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+
+      if (!profileResponse.ok) {
+        throw new Error('Failed to get user profile');
+      }
+
+      const profile = await profileResponse.json();
+
+      // Validate delivery address
+      if (!profile.street_1 || !profile.city || !profile.state || !profile.zip) {
+        toast.error('Please complete your delivery address in your profile');
+        onClose();
+        router.push('/profile');
+        return;
+      }
 
       // Create the order
       const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
@@ -196,27 +193,44 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify({
+          token: user.token,
+          user_id: user.id,
+          store_id: store.id,
+          payment_method_id: selectedCardId,
+          items: items.map(item => ({
+            store_item_id: item.id,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          subtotal_amount: orderSummary.subtotalAmount,
+          tax_amount: orderSummary.taxAmount,
+          delivery_fee: orderSummary.deliveryFee,
+          total_amount: orderSummary.totalAmount,
+          delivery_address: {
+            street_address: [profile.street_1].concat(profile.street_2 ? [profile.street_2] : []),
+            city: profile.city,
+            state: profile.state,
+            zip_code: profile.zip,
+            country: 'US'
+          }
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create order');
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create order');
       }
 
       const data = await response.json();
       
-      // Clear the cart
-      clearCart();
-      
-      // Show success message
       toast.success('Order placed successfully!');
-      
-      // Close the modal
+      clearCart();
       onClose();
-
+      router.push('/orders');
     } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error('Failed to place order. Please try again.');
+      console.error('Error creating order:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create order');
     } finally {
       setIsCheckingOut(false);
       setShowCheckoutConfirm(false);
@@ -351,60 +365,62 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                         </div>
                       )}
 
-                      <div className="flex justify-between text-lg font-medium text-[#2D3748]">
-                        <p>Subtotal</p>
-                        <p>${totalPrice.toFixed(2)}</p>
-                      </div>
-                      <p className="mt-0.5 body-small text-[#4A5568]">
-                        Shipping and taxes will be calculated at checkout.
-                      </p>
-                      <div className="mt-6">
-                        {showCheckoutConfirm ? (
-                          <div className="space-y-4">
-                            <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 space-y-2">
-                              <div className="flex justify-between text-sm text-[#4A5568]">
-                                <span>Subtotal</span>
-                                <span>${orderSummary?.subtotalAmount.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm text-[#4A5568]">
-                                <span>Tax (8.875%)</span>
-                                <span>${orderSummary?.taxAmount.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm text-[#4A5568]">
-                                <span>Delivery Fee</span>
-                                <span>${orderSummary?.deliveryFee.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-base font-medium text-[#2D3748] pt-2 border-t border-[#2A9D8F]/10">
-                                <span>Total</span>
-                                <span>${orderSummary?.totalAmount.toFixed(2)}</span>
-                              </div>
+                      {showCheckoutConfirm ? (
+                        <div className="space-y-4">
+                          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 space-y-2">
+                            <div className="flex justify-between text-sm text-[#4A5568]">
+                              <span>Subtotal</span>
+                              <span>${orderSummary?.subtotalAmount.toFixed(2)}</span>
                             </div>
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => setShowCheckoutConfirm(false)}
-                                className="flex-1 rounded-md border border-[#2A9D8F] bg-white px-6 py-3 text-base font-medium text-[#2A9D8F] shadow-sm hover:bg-[#2A9D8F]/5"
-                              >
-                                Back
-                              </button>
-                              <button
-                                onClick={handleCheckout}
-                                disabled={isCheckingOut}
-                                className="flex-1 rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isCheckingOut ? 'Processing...' : 'Submit Order'}
-                              </button>
+                            <div className="flex justify-between text-sm text-[#4A5568]">
+                              <span>Tax (8.875%)</span>
+                              <span>${orderSummary?.taxAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-[#4A5568]">
+                              <span>Delivery Fee</span>
+                              <span>${orderSummary?.deliveryFee.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-base font-medium text-[#2D3748] pt-2 border-t border-[#2A9D8F]/10">
+                              <span>Total</span>
+                              <span>${orderSummary?.totalAmount.toFixed(2)}</span>
                             </div>
                           </div>
-                        ) : (
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => setShowCheckoutConfirm(false)}
+                              className="flex-1 rounded-md border border-[#2A9D8F] bg-white px-6 py-3 text-base font-medium text-[#2A9D8F] shadow-sm hover:bg-[#2A9D8F]/5"
+                            >
+                              Back
+                            </button>
+                            <button
+                              onClick={handleCheckout}
+                              disabled={isCheckingOut}
+                              className="flex-1 rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isCheckingOut ? 'Processing...' : 'Submit Order'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mb-4">
+                            <div className="flex justify-between text-sm text-[#4A5568]">
+                              <span>Items Subtotal</span>
+                              <span>${totalPrice.toFixed(2)}</span>
+                            </div>
+                            <p className="mt-1 text-sm text-[#4A5568]">
+                              Tax and delivery fee will be calculated at checkout.
+                            </p>
+                          </div>
                           <button
                             onClick={handleCheckoutClick}
                             disabled={isCheckingOut || items.length === 0 || savedCards.length === 0}
                             className="w-full flex items-center justify-center rounded-md border border-transparent bg-[#2A9D8F] px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-[#40B4A6] active:bg-[#1E7268] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {isCheckingOut ? 'Processing...' : 'Checkout'}
+                            {isCheckingOut ? 'Processing...' : 'Go to checkout'}
                           </button>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </Dialog.Panel>

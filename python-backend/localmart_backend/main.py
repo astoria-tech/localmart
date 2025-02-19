@@ -44,14 +44,22 @@ stripe.api_key = Config.STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET = Config.STRIPE_WEBHOOK_SECRET
 
 @contextmanager
-def user_auth_context(token: str):
-    """Context manager to handle user authentication state"""
+def user_auth_context(token: Optional[str]):
+    """Context manager to handle user authentication for PocketBase operations"""
+    if not token:
+        raise HTTPException(status_code=401, detail="No authorization token")
+    
     try:
-        pb_service.set_token(token)
+        # Verify the user's token
+        token = token.split(' ')[1] if token.startswith('Bearer ') else token
         user = pb_service.get_user_from_token(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
         yield user
-    finally:
-        pb_service.clear_token()
+    except Exception as e:
+        logger.error(f"Auth error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 def get_token_from_request(request: Request) -> str:
     """Extract and validate the auth token from a request"""
@@ -242,63 +250,64 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
 async def create_order(request: Dict):
     """Create a new order with basic status tracking"""
     try:
-        # Get the payment method
-        payment_method = pb_service.get_one('payment_methods', request['payment_method_id'])
-        if not payment_method:
-            raise HTTPException(status_code=400, detail="Invalid payment method")
+        # Get the payment method within the user's auth context
+        with user_auth_context(request.get('token')) as user:
+            payment_method = pb_service.get_one('payment_methods', request['payment_method_id'])
+            if not payment_method:
+                raise HTTPException(status_code=400, detail="Invalid payment method")
 
-        # Get the customer
-        customers = pb_service.get_list(
-            'stripe_customers',
-            query_params={"filter": f'user = "{request["user_id"]}"'}
-        )
-        if not customers.items:
-            raise HTTPException(status_code=400, detail="No Stripe customer found")
-        
-        stripe_customer_id = customers.items[0].stripe_customer_id
+            # Get the customer
+            customers = pb_service.get_list(
+                'stripe_customers',
+                query_params={"filter": f'user = "{request["user_id"]}"'}
+            )
+            if not customers.items:
+                raise HTTPException(status_code=400, detail="No Stripe customer found")
+            
+            stripe_customer_id = customers.items[0].stripe_customer_id
 
-        # Create a payment intent
-        payment_intent = stripe.PaymentIntent.create(
-            amount=int(request['total_amount'] * 100),  # Convert to cents
-            currency='usd',
-            customer=stripe_customer_id,
-            payment_method=payment_method.stripe_payment_method_id,
-            off_session=True,
-            confirm=True,
-        )
+            # Create a payment intent
+            payment_intent = stripe.PaymentIntent.create(
+                amount=int(request['total_amount'] * 100),  # Convert to cents
+                currency='usd',
+                customer=stripe_customer_id,
+                payment_method=payment_method.stripe_payment_method_id,
+                off_session=True,
+                confirm=True,
+            )
 
-        # Create the order in PocketBase with simplified fields
-        order = pb_service.create('orders', {
-            'user': request['user_id'],
-            'store': request['store_id'],
-            'status': 'pending',  # Initial status
-            'payment_status': 'pending',  # Initial payment status
-            'payment_method': payment_method.id,  # Link to payment method
-            'stripe_payment_intent_id': payment_intent.id,
-            'subtotal_amount': request['subtotal_amount'],
-            'tax_amount': request['tax_amount'],
-            'delivery_fee': request['delivery_fee'],
-            'total_amount': request['total_amount'],
-            'delivery_address': request['delivery_address'],
-            'customer_notes': request.get('customer_notes', ''),
-        })
-
-        # Create order items
-        for item in request['items']:
-            pb_service.create('order_items', {
-                'order': order.id,
-                'store_item': item['store_item_id'],
-                'quantity': item['quantity'],
-                'price_at_time': item['price'],
-                'total_price': item['price'] * item['quantity']
+            # Create the order in PocketBase with simplified fields
+            order = pb_service.create('orders', {
+                'user': request['user_id'],
+                'store': request['store_id'],
+                'status': 'pending',  # Initial status
+                'payment_status': 'pending',  # Initial payment status
+                'payment_method': payment_method.id,  # Link to payment method
+                'stripe_payment_intent_id': payment_intent.id,
+                'subtotal_amount': request['subtotal_amount'],
+                'tax_amount': request['tax_amount'],
+                'delivery_fee': request['delivery_fee'],
+                'total_amount': request['total_amount'],
+                'delivery_address': request['delivery_address'],
+                'customer_notes': request.get('customer_notes', ''),
             })
 
-        return {
-            'order_id': order.id,
-            'status': 'pending',
-            'payment_intent_client_secret': payment_intent.client_secret,
-            'message': 'Order created successfully'
-        }
+            # Create order items
+            for item in request['items']:
+                pb_service.create('order_items', {
+                    'order': order.id,
+                    'store_item': item['store_item_id'],
+                    'quantity': item['quantity'],
+                    'price_at_time': item['price'],
+                    'total_price': item['price'] * item['quantity']
+                })
+
+            return {
+                'order_id': order.id,
+                'status': 'pending',
+                'payment_intent_client_secret': payment_intent.client_secret,
+                'message': 'Order created successfully'
+            }
 
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error creating order: {str(e)}")
@@ -369,22 +378,9 @@ async def get_user_orders(request: Request):
                 })
 
             user = order.expand.get('user', {})
-
-            if not user:
-                print(f"Order: {order}")
-                print(f"Order expand: {order.expand}")
-
-            # Get user info from expanded user record
             customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
             
-            # Format user's address
-            delivery_address = {
-                'street_address': [user.street_1] + ([user.street_2] if user.street_2 else []),
-                'city': user.city,
-                'state': user.state,
-                'zip_code': user.zip,
-                'country': 'US'
-            } if user else None
+            delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
 
             formatted_order = {
                 'id': order.id,
@@ -900,11 +896,11 @@ async def get_store_orders(store_id: str, request: Request):
                 store_roles = pb_service.get_list(
                     'store_roles',
                     query_params={
-                        "filter": f'user = "{user_id}" && store = "{store_id}"'
+                        "filter": f'user = "{user_id}" && store = "{store_id}" && role = "admin"'
                     }
                 )
                 
-                if not any(sr.role == 'admin' for sr in store_roles.items):
+                if not store_roles.items:
                     raise HTTPException(
                         status_code=403,
                         detail="You don't have permission to view this store's orders"
@@ -915,7 +911,8 @@ async def get_store_orders(store_id: str, request: Request):
                 'orders',
                 query_params={
                     "sort": "-created",
-                    "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store,user"
+                    "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store,user",
+                    "filter": f'order_items_via_order.store_item.store = "{store_id}"'
                 }
             )
 
@@ -925,8 +922,7 @@ async def get_store_orders(store_id: str, request: Request):
                 stores_dict = {}
                 order_items = order.expand.get('order_items_via_order', [])
 
-                # Check if any order items belong to this store
-                has_store_items = False
+                # Process items for this store
                 for item in order_items:
                     if not hasattr(item, 'expand') or not item.expand.get('store_item'):
                         continue
@@ -936,10 +932,6 @@ async def get_store_orders(store_id: str, request: Request):
                         continue
 
                     store = store_item.expand['store']
-                    if store.id != store_id:  # Skip items not from this store
-                        continue
-
-                    has_store_items = True
                     store_id_key = store.id
                     if store_id_key not in stores_dict:
                         stores_dict[store_id_key] = {
@@ -957,33 +949,25 @@ async def get_store_orders(store_id: str, request: Request):
                         'price': item.price_at_time
                     })
 
-                # Only include orders that have items from this store
-                if has_store_items:
-                    user = order.expand.get('user', {})
-                    customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
-                    
-                    delivery_address = {
-                        'street_address': [user.street_1] + ([user.street_2] if user.street_2 else []),
-                        'city': user.city,
-                        'state': user.state,
-                        'zip_code': user.zip,
-                        'country': 'US'
-                    } if user else None
+                user = order.expand.get('user', {})
+                customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
+                
+                delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
 
-                    formatted_order = {
-                        'id': order.id,
-                        'created': order.created,
-                        'status': order.status,
-                        'payment_status': order.payment_status,
-                        'delivery_fee': order.delivery_fee,
-                        'total_amount': order.total_amount,
-                        'tax_amount': order.tax_amount,
-                        'customer_name': customer_name,
-                        'customer_phone': getattr(user, 'phone_number', None),
-                        'delivery_address': delivery_address,
-                        'stores': list(stores_dict.values())
-                    }
-                    formatted_orders.append(formatted_order)
+                formatted_order = {
+                    'id': order.id,
+                    'created': order.created,
+                    'status': order.status,
+                    'payment_status': order.payment_status,
+                    'delivery_fee': order.delivery_fee,
+                    'total_amount': order.total_amount,
+                    'tax_amount': order.tax_amount,
+                    'customer_name': customer_name,
+                    'customer_phone': getattr(user, 'phone_number', None),
+                    'delivery_address': delivery_address,
+                    'stores': list(stores_dict.values())
+                }
+                formatted_orders.append(formatted_order)
 
             return formatted_orders
         except HTTPException:
