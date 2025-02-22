@@ -17,3 +17,17 @@ To clear the database
 ```bash
 rm -rf ./volumes
 ```
+
+## Debugging Tips
+If the app is not loading porperly on your machine, try clear the cache and restart.
+
+To rebuild the backend:
+```bash
+make
+```
+To rebuild the frontend, if NextJS is giving errors:
+```bash
+cd frontend/
+rm -rf .next
+make
+```
