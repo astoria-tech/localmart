@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { ClerkProvider } from '@clerk/nextjs';
 import { AuthProvider } from './contexts/auth';
 import { CartProvider } from './contexts/cart';
 import { FeatureFlagsProvider } from './contexts/featureFlags';
@@ -36,14 +37,16 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${dmSans.variable} font-sans antialiased`}
       >
-        <FeatureFlagsProvider>
-          <AuthProvider>
-            <CartProvider>
-              <Header />
-              {children}
-            </CartProvider>
-          </AuthProvider>
-        </FeatureFlagsProvider>
+        <ClerkProvider>
+          <FeatureFlagsProvider>
+            <AuthProvider>
+              <CartProvider>
+                <Header />
+                {children}
+              </CartProvider>
+            </AuthProvider>
+          </FeatureFlagsProvider>
+        </ClerkProvider>
         <Toaster position="bottom-right" />
       </body>
     </html>
