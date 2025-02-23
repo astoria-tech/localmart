@@ -4,19 +4,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { useStoreRoles } from '@/app/hooks/useStoreRoles';
 import { toast } from 'react-hot-toast';
-import { config } from '@/config';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-
-interface StoreItem {
-  id: string;
-  name: string;
-  price: number;
-  description?: string;
-  imageUrl?: string;
-}
+import { storesApi, StoreItem } from '@/api';
 
 interface EditItemModalProps {
   item?: StoreItem;
@@ -140,20 +132,11 @@ export default function StoreInventory({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const fetchStoreAndItems = async () => {
       try {
-        // Fetch store details
-        const storeResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}`);
-        if (!storeResponse.ok) {
-          throw new Error('Failed to fetch store');
-        }
-        const storeData = await storeResponse.json();
+        // Fetch store details and items
+        const storeData = await storesApi.getStore(storeId);
         setStore(storeData);
 
-        // Fetch store items
-        const itemsResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items`);
-        if (!itemsResponse.ok) {
-          throw new Error('Failed to fetch store items');
-        }
-        const itemsData = await itemsResponse.json();
+        const itemsData = await storesApi.getStoreItems(storeId);
         setItems(itemsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch store data');
@@ -178,37 +161,17 @@ export default function StoreInventory({ params }: { params: Promise<{ id: strin
   };
 
   const handleSaveItem = async (itemData: Partial<StoreItem>) => {
+    if (!user?.token) return;
+
     try {
       if (editingItem) {
         // Update existing item
-        const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items/${editingItem.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${user?.token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(itemData)
-        });
-
-        if (!response.ok) throw new Error('Failed to update item');
-
-        const updatedItem = await response.json();
+        const updatedItem = await storesApi.updateStoreItem(user.token, storeId, editingItem.id, itemData);
         setItems(items.map(item => item.id === editingItem.id ? updatedItem : item));
         toast.success('Item updated successfully');
       } else {
         // Create new item
-        const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${user?.token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(itemData)
-        });
-
-        if (!response.ok) throw new Error('Failed to create item');
-
-        const newItem = await response.json();
+        const newItem = await storesApi.createStoreItem(user.token, storeId, itemData);
         setItems([...items, newItem]);
         toast.success('Item created successfully');
       }
@@ -221,18 +184,10 @@ export default function StoreInventory({ params }: { params: Promise<{ id: strin
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    if (!user?.token || !confirm('Are you sure you want to delete this item?')) return;
 
     try {
-      const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items/${itemId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${user?.token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to delete item');
-
+      await storesApi.deleteStoreItem(user.token, storeId, itemId);
       setItems(items.filter(item => item.id !== itemId));
       toast.success('Item deleted successfully');
     } catch (error) {

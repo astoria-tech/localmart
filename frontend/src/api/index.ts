@@ -44,6 +44,9 @@ export interface Order {
     city: string;
     state: string;
     zip_code: string;
+    country?: string;
+    customer_name?: string;
+    customer_phone?: string;
   };
   customer_phone?: string;
   stores: {

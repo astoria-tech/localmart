@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/auth';
-import { config } from '@/config';
+import { storesApi } from '@/api';
 
 export function useStoreRoles(storeId: string) {
   const { user } = useAuth();
@@ -15,20 +15,7 @@ export function useStoreRoles(storeId: string) {
       }
 
       try {
-        const response = await fetch(
-          `${config.apiUrl}/api/v0/stores/${storeId}/roles`,
-          {
-            headers: {
-              'Authorization': `Bearer ${user.token}`
-            }
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch store roles');
-        }
-
-        const data = await response.json();
+        const data = await storesApi.getStoreRoles(user.token, storeId);
         setRoles(data.roles);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch store roles');

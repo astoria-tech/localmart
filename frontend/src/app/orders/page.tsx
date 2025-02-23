@@ -7,6 +7,7 @@ import { config } from '@/config';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useRouter } from 'next/navigation';
+import { ordersApi, Order } from '@/api';
 
 interface OrderItem {
   id: string;
@@ -17,31 +18,6 @@ interface OrderItem {
     id: string;
     name: string;
   };
-}
-
-interface Order {
-  id: string;
-  created: string;
-  status: string;
-  payment_status: string;
-  delivery_fee: number;
-  total_amount: number;
-  delivery_address: {
-    street_address: string[];
-    city: string;
-    state: string;
-    zip_code: string;
-    country: string;
-    customer_name: string;
-    customer_phone?: string;
-  } | null;
-  stores: Array<{
-    store: {
-      id: string;
-      name: string;
-    };
-    items: OrderItem[];
-  }>;
 }
 
 interface DailyCount {
@@ -240,57 +216,34 @@ export default function OrdersDashboard() {
           return;
         }
 
-        const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
-          headers: {
-            'Authorization': `Bearer ${user?.token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data = await response.json();
-        setOrders(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch orders');
+        const orders = await ordersApi.getAdminOrders(user.token);
+        setOrders(orders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch orders');
       } finally {
         setLoading(false);
       }
     };
 
-    if (user) {
+    if (user?.token) {
       fetchOrders();
     }
   }, [user]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    if (!user?.token) return;
+
     try {
-      const response = await fetch(`${config.apiUrl}/api/v0/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${user?.token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update order status');
-      }
-
-      setOrders(currentOrders =>
-        currentOrders.map(order =>
-          order.id === orderId
-            ? { ...order, status: newStatus }
-            : order
+      const updatedOrder = await ordersApi.updateOrderStatus(user.token, orderId, newStatus);
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId ? updatedOrder : order
         )
       );
-
-      toast.success('Order status updated');
-    } catch (err) {
-      console.error('Status update error:', err);
+      toast.success('Order status updated successfully');
+    } catch (error) {
+      console.error('Error updating order status:', error);
       toast.error('Failed to update order status');
     }
   };

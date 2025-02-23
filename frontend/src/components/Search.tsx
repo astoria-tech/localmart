@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearch } from "@/app/contexts/search";
 import { SearchItem } from "@/app/contexts/search";
-import { config } from "@/config";
+import { searchApi } from "@/api";
 
 export function Search() {
   const { setSearchItems, setIsLoading, isLoading } = useSearch();
@@ -15,12 +15,7 @@ export function Search() {
   const handleSearch = async (searchQuery: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `${config.searchUrl}/api/search?query=${encodeURIComponent(
-          searchQuery,
-        )}&index=${productIndex}`,
-      );
-      const { hits } = await response.json();
+      const hits = await searchApi.searchProducts(searchQuery);
       setSearchItems(hits as SearchItem[]);
     } catch (error) {
       console.error("Search failed:", error);

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
-import { config } from '@/config';
 import { formatCurrency } from '@/utils/currency';
 import { MapPinIcon, BuildingStorefrontIcon, XMarkIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useRouter, useParams } from 'next/navigation';
@@ -12,6 +11,7 @@ import type { LatLngExpression, LatLngTuple } from 'leaflet';
 import styles from './map.module.css';
 import ReactDOMServer from 'react-dom/server';
 import L from 'leaflet';
+import { ordersApi, Order } from '@/api';
 
 // Dynamically import the map components to avoid SSR issues
 const MapContainer = dynamic(
@@ -35,48 +35,6 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number;
-}
-
-interface Store {
-  store: {
-    id: string;
-    name: string;
-  };
-  items: OrderItem[];
-}
-
-interface Order {
-  id: string;
-  created: string;
-  status: string;
-  payment_status: string;
-  delivery_fee: number;
-  total_amount: number;
-  tax_amount: number;
-  delivery_address?: {
-    street_address: string[];
-    city: string;
-    state: string;
-    zip_code: string;
-  };
-  customer_phone?: string;
-  stores: Store[];
-}
-
-const formatDateTime = (isoString: string) => {
-  const utcDate = new Date(isoString + 'Z');
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }).format(utcDate);
-};
-
 // Mock coordinates for demo (we'll replace these with real geocoding later)
 const MOCK_COORDINATES: { store: LatLngTuple; delivery: LatLngTuple } = {
   store: [40.7594, -73.9229],
@@ -96,6 +54,15 @@ const DeliveryMarker = () => (
   </div>
 );
 
+const formatDateTime = (isoString: string) => {
+  const utcDate = new Date(isoString + 'Z');
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(utcDate);
+};
+
 export default function OrderViewPage() {
   const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
@@ -112,18 +79,8 @@ export default function OrderViewPage() {
       if (!user?.token || !orderId) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const orders = await response.json();
-        const order = orders.find((o: Order) => o.id === orderId);
+        const orders = await ordersApi.getAdminOrders(user.token);
+        const order = orders.find(o => o.id === orderId);
         
         if (!order) {
           throw new Error('Order not found');

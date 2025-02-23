@@ -10,6 +10,7 @@ import { use } from 'react';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
+import { storesApi, ordersApi, Order } from '@/api';
 
 interface OrderItem {
   id: string;
@@ -24,25 +25,6 @@ interface Store {
     name: string;
   };
   items: OrderItem[];
-}
-
-interface Order {
-  id: string;
-  created: string;
-  status: string;
-  payment_status: string;
-  delivery_fee: number;
-  total_amount: number;
-  delivery_address: {
-    street_address: string[];
-    city: string;
-    state: string;
-    zip_code: string;
-    country: string;
-    customer_name: string;
-    customer_phone?: string;
-  } | null;
-  stores: Store[];
 }
 
 interface DailyCount {
@@ -249,23 +231,24 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user?.token || rolesLoading) return; // Don't fetch if still loading roles
+      if (!user?.token) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/orders`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-          },
-        });
+        const orders = await storesApi.getStoreOrders(user.token, storeId);
+        setOrders(orders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch orders');
+      }
+    };
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data = await response.json();
-        setOrders(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch orders');
+    const fetchStore = async () => {
+      try {
+        const store = await storesApi.getStore(storeId);
+        setStore(store);
+      } catch (error) {
+        console.error('Error fetching store:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch store');
       } finally {
         setLoading(false);
       }
@@ -273,27 +256,9 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
 
     if (isAdmin) {
       fetchOrders();
+      fetchStore();
     }
-  }, [user, storeId, isAdmin, rolesLoading]);
-
-  // Fetch store details
-  useEffect(() => {
-    const fetchStore = async () => {
-      try {
-        const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch store details');
-        }
-        const data = await response.json();
-        setStore(data);
-      } catch (err) {
-        console.error('Error fetching store:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch store details');
-      }
-    };
-
-    fetchStore();
-  }, [storeId]);
+  }, [storeId, isAdmin, user]);
 
   // Toggle status filter
   const toggleStatus = (status: string) => {
@@ -327,7 +292,7 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
       const lowercaseSearch = searchTerm.toLowerCase();
       result = result.filter(order => 
         order.id.toLowerCase().includes(lowercaseSearch) ||
-        order.delivery_address?.customer_name.toLowerCase().includes(lowercaseSearch)
+        order.delivery_address?.customer_name?.toLowerCase().includes(lowercaseSearch) || false
       );
     }
     
