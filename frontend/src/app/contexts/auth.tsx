@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { config } from '@/config';
+import { useSignIn } from '@clerk/nextjs';
 
 interface User {
   id: string;
@@ -15,12 +16,16 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
+  sendMagicLink: (email: string) => Promise<void>;
+  isProcessingMagicLink: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isProcessingMagicLink, setIsProcessingMagicLink] = useState(false);
+  const { signIn, isLoaded: isClerkLoaded } = useSignIn();
 
   useEffect(() => {
     // Check for saved auth data on mount
@@ -95,8 +100,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('auth');
   };
 
+  const sendMagicLink = async (email: string) => {
+    if (!isClerkLoaded) return;
+    
+    try {
+      setIsProcessingMagicLink(true);
+      await signIn.create({
+        strategy: 'email_link',
+        identifier: email,
+        redirectUrl: `${window.location.origin}/login`,
+      });
+    } catch (error) {
+      console.error('Error sending magic link:', error);
+      throw error;
+    } finally {
+      setIsProcessingMagicLink(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      signup, 
+      logout,
+      sendMagicLink,
+      isProcessingMagicLink
+    }}>
       {children}
     </AuthContext.Provider>
   );

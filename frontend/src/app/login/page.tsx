@@ -4,13 +4,15 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { BuildingStorefrontIcon } from '@heroicons/react/24/outline';
+import { BuildingStorefrontIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 function LoginForm() {
-  const { login, signup } = useAuth();
+  const { login, signup, sendMagicLink, isProcessingMagicLink } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSignup, setIsSignup] = useState(false);
+  const [isMagicLink, setIsMagicLink] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -29,6 +31,12 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
+      if (isMagicLink) {
+        await sendMagicLink(email);
+        toast.success('Check your email for the magic link!');
+        return;
+      }
+      
       if (isSignup) {
         await signup(email, password, `${firstName} ${lastName}`);
       } else {
@@ -37,16 +45,20 @@ function LoginForm() {
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
+      if (isMagicLink) {
+        toast.error('Failed to send magic link. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const toggleMode = () => {
+  const toggleMode = (mode: 'signup' | 'login' | 'magic-link') => {
     setError('');
-    setIsSignup(!isSignup);
+    setIsSignup(mode === 'signup');
+    setIsMagicLink(mode === 'magic-link');
     // Update URL without refreshing the page
-    const newUrl = !isSignup ? '/login?signup=true' : '/login';
+    const newUrl = mode === 'signup' ? '/login?signup=true' : '/login';
     window.history.pushState({}, '', newUrl);
   };
 
@@ -65,7 +77,7 @@ function LoginForm() {
           </h2>
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-4">
-              {isSignup && (
+              {isSignup && !isMagicLink && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="firstName" className="sr-only">
@@ -115,22 +127,24 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div>
-                <label htmlFor="password" className="sr-only">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete={isSignup ? 'new-password' : 'current-password'}
-                  required
-                  className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+              {!isMagicLink && (
+                <div>
+                  <label htmlFor="password" className="sr-only">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                    required
+                    className="appearance-none relative block w-full px-3 py-2 border border-[#2A9D8F]/20 rounded-md placeholder-[#4A5568] text-[#2D3748] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:border-transparent bg-white/50"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             {error && (
@@ -143,8 +157,10 @@ function LoginForm() {
                 disabled={isLoading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-white bg-[#2A9D8F] hover:bg-[#40B4A6] active:bg-[#1E7268] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2A9D8F] transition-colors duration-200"
               >
-                {isLoading ? (
+                {isLoading || isProcessingMagicLink ? (
                   'Loading...'
+                ) : isMagicLink ? (
+                  'Send Magic Link'
                 ) : isSignup ? (
                   'Sign up'
                 ) : (
@@ -153,15 +169,31 @@ function LoginForm() {
               </button>
             </div>
 
-            <div className="text-sm text-center">
+            <div className="text-sm text-center space-y-2">
+              {!isMagicLink && (
+                <button
+                  type="button"
+                  onClick={() => toggleMode(isSignup ? 'login' : 'signup')}
+                  className="font-medium text-[#2A9D8F] hover:text-[#40B4A6] block w-full"
+                >
+                  {isSignup
+                    ? 'Already have an account? Login'
+                    : "Don't have an account? Sign up"}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={toggleMode}
-                className="font-medium text-[#2A9D8F] hover:text-[#40B4A6]"
+                onClick={() => toggleMode(isMagicLink ? 'login' : 'magic-link')}
+                className="font-medium text-[#2A9D8F] hover:text-[#40B4A6] flex items-center justify-center gap-2 w-full"
               >
-                {isSignup
-                  ? 'Already have an account? Login'
-                  : "Don't have an account? Sign up"}
+                {isMagicLink ? (
+                  'Back to password login'
+                ) : (
+                  <>
+                    <EnvelopeIcon className="h-4 w-4" />
+                    Sign in with magic link
+                  </>
+                )}
               </button>
             </div>
           </form>
