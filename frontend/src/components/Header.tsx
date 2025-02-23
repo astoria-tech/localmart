@@ -50,7 +50,7 @@ export default function Header() {
       try {
         console.log('User token:', user.token?.slice(0, 20) + '...')  // Log first 20 chars of token
         
-        const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
+        const response = await fetch(`${config.apiUrl}/api/v0/user/orders`, {
           headers: {
             'Authorization': `Bearer ${user.token}`,
             'Content-Type': 'application/json'
@@ -97,7 +97,7 @@ export default function Header() {
                     href="/orders"
                     className="text-sm text-white/80 hover:text-white transition-colors ml-2"
                   >
-                    orders
+                    admin
                   </Link>
                 </>
               )}
