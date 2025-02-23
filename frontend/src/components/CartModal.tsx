@@ -8,24 +8,11 @@ import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
 import { config } from '@/config';
 import { useRouter } from 'next/navigation';
+import { storesApi, paymentApi, authApi, ordersApi, SavedCard, Store } from '@/api';
 
 interface CartModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface Store {
-  id: string;
-  name: string;
-}
-
-interface SavedCard {
-  id: string;
-  last4: string;
-  brand: string;
-  exp_month: number;
-  exp_year: number;
-  isDefault: boolean;
 }
 
 export default function CartModal({ isOpen, onClose }: CartModalProps) {
@@ -33,10 +20,10 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [store, setStore] = useState<Store | null>(null);
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderSummary, setOrderSummary] = useState<{
     subtotalAmount: number;
     taxAmount: number;
@@ -60,25 +47,17 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
     setIsCheckingOut(false);
   }, [items]);
 
-  // Fetch store details when items change
+  // Fetch store details when cart has items
   useEffect(() => {
     const fetchStore = async () => {
       if (items.length > 0) {
         try {
-          const response = await fetch(`${config.apiUrl}/api/v0/stores/${items[0].store}`);
-          if (!response.ok) {
-            console.error(`Failed to fetch store: ${response.status} ${response.statusText}`);
-            const errorData = await response.json().catch(() => ({}));
-            console.error('Error details:', errorData);
-            return;
-          }
-          const storeData = await response.json();
+          const storeData = await storesApi.getStore(items[0].store);
           setStore(storeData);
         } catch (error) {
           console.error('Error fetching store:', error);
+          toast.error('Failed to load store details');
         }
-      } else {
-        setStore(null);
       }
     };
 
@@ -91,26 +70,10 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/payment/cards`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
-
-        if (response.status === 404) {
-          // No cards found is a valid state
-          setSavedCards([]);
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch cards');
-        }
-
-        const cards = await response.json();
-        setSavedCards(Array.isArray(cards) ? cards : []);
+        const cards = await paymentApi.getCards(user.token);
+        setSavedCards(cards);
         // Set the default card if available
-        const defaultCard = cards.find((card: SavedCard) => card.isDefault);
+        const defaultCard = cards.find(card => card.isDefault);
         if (defaultCard) {
           setSelectedCardId(defaultCard.id);
         } else if (cards.length > 0) {
@@ -118,7 +81,6 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
         }
       } catch (error) {
         console.error('Error fetching cards:', error);
-        // Don't show error toast for no cards
         setSavedCards([]);
       }
     };
@@ -166,17 +128,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
     setIsCheckingOut(true);
     try {
       // Get user's profile for delivery address
-      const profileResponse = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
-        headers: {
-          'Authorization': `Bearer ${user.token}`
-        }
-      });
-
-      if (!profileResponse.ok) {
-        throw new Error('Failed to get user profile');
-      }
-
-      const profile = await profileResponse.json();
+      const profile = await authApi.getProfile(user.token);
 
       // Validate delivery address
       if (!profile.street_1 || !profile.city || !profile.state || !profile.zip) {
@@ -187,51 +139,36 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       }
 
       // Create the order
-      const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify({
-          token: user.token,
-          user_id: user.id,
-          store_id: store.id,
-          payment_method_id: selectedCardId,
-          items: items.map(item => ({
-            store_item_id: item.id,
-            quantity: item.quantity,
-            price: item.price
-          })),
-          subtotal_amount: orderSummary.subtotalAmount,
-          tax_amount: orderSummary.taxAmount,
-          delivery_fee: orderSummary.deliveryFee,
-          total_amount: orderSummary.totalAmount,
-          delivery_address: {
-            street_address: [profile.street_1].concat(profile.street_2 ? [profile.street_2] : []),
-            city: profile.city,
-            state: profile.state,
-            zip_code: profile.zip,
-            country: 'US'
-          }
-        })
+      await ordersApi.createOrder(user.token, {
+        token: user.token,
+        user_id: user.id,
+        store_id: store.id,
+        payment_method_id: selectedCardId,
+        items: items.map(item => ({
+          store_item_id: item.id,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        subtotal_amount: orderSummary.subtotalAmount,
+        tax_amount: orderSummary.taxAmount,
+        delivery_fee: orderSummary.deliveryFee,
+        total_amount: orderSummary.totalAmount,
+        delivery_address: {
+          street_address: [profile.street_1].concat(profile.street_2 ? [profile.street_2] : []),
+          city: profile.city,
+          state: profile.state,
+          zip_code: profile.zip,
+          country: 'US'
+        }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to create order');
-      }
-
-      const data = await response.json();
-      
       toast.success('Order placed successfully!');
       clearCart();
       onClose();
-      // Navigate to the order page
-      router.push(`/orders/${data.order_id}`);
+      router.push('/orders');
     } catch (error) {
       console.error('Error creating order:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create order');
+      toast.error('Failed to place order');
     } finally {
       setIsCheckingOut(false);
       setShowCheckoutConfirm(false);

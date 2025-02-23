@@ -8,6 +8,7 @@ import OrderHistoryModal from './OrderHistoryModal'
 import CartModal from './CartModal'
 import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
 import { config } from '@/config'
+import { authApi, ordersApi, Order } from '@/api'
 
 export default function Header() {
   const { user, logout } = useAuth()
@@ -15,7 +16,7 @@ export default function Header() {
   const { totalItems } = useCart()
   const [showOrderHistory, setShowOrderHistory] = useState(false)
   const [showCart, setShowCart] = useState(false)
-  const [orders, setOrders] = useState([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [firstName, setFirstName] = useState('')
 
   useEffect(() => {
@@ -23,18 +24,7 @@ export default function Header() {
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-
-        const data = await response.json();
-        console.log('Profile data:', data); // Debug log
+        const data = await authApi.getProfile(user.token);
         setFirstName(data.first_name || 'there');
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -48,27 +38,11 @@ export default function Header() {
   const handleShowOrderHistory = async () => {
     if (user) {
       try {
-        console.log('User token:', user.token?.slice(0, 20) + '...')  // Log first 20 chars of token
-        
-        const response = await fetch(`${config.apiUrl}/api/v0/user/orders`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Orders error response:', errorData)  // Log error response
-          throw new Error(errorData.detail || 'Failed to fetch orders');
-        }
-        
-        const data = await response.json()
-        console.log('Orders fetched:', data)  // Debug log
-        setOrders(data)
-        setShowOrderHistory(true)
+        const data = await ordersApi.getUserOrders(user.token);
+        setOrders(data);
+        setShowOrderHistory(true);
       } catch (error) {
-        console.error('Failed to fetch orders:', error)
+        console.error('Failed to fetch orders:', error);
       }
     }
   }

@@ -8,24 +8,7 @@ import { Search } from '@/components/Search';
 import { useFeatureFlag } from '@/app/contexts/featureFlags';
 import { useCart } from '@/app/contexts/cart';
 import { toast } from 'react-hot-toast';
-
-interface Store {
-  id: string;
-  name: string;
-  street_1: string;
-  street_2?: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  items?: StoreItem[];
-}
-
-interface StoreItem {
-  id: string;
-  name: string;
-  price: number;
-  imageUrl?: string;
-}
+import { storesApi, Store, StoreItem } from '@/api';
 
 export default function Page() {
   const [stores, setStores] = useState<Store[]>([]);
@@ -37,31 +20,7 @@ export default function Page() {
   useEffect(() => {
     const fetchStores = async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        // Fetch stores
-        const storesResponse = await fetch(`${baseUrl}/api/v0/stores`);
-        if (!storesResponse.ok) {
-          throw new Error('Failed to fetch stores');
-        }
-        const storesData = await storesResponse.json();
-        
-        // Fetch items for each store
-        const storesWithItems = await Promise.all(
-          storesData.map(async (store: Store) => {
-            const itemsResponse = await fetch(`${baseUrl}/api/v0/stores/${store.id}/items`);
-            if (itemsResponse.ok) {
-              const items = await itemsResponse.json();
-              // Add mock image URLs to items
-              const itemsWithImages = items.map((item: StoreItem) => ({
-                ...item,
-                imageUrl: `https://picsum.photos/seed/${item.id}/400/300`
-              }));
-              return { ...store, items: itemsWithImages };
-            }
-            return store;
-          })
-        );
-        
+        const storesWithItems = await storesApi.getAllStoresWithItems();
         setStores(storesWithItems);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch stores');

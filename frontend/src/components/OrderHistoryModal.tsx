@@ -7,7 +7,13 @@ import { ClockIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/contexts/auth'
 import { toast } from 'react-hot-toast'
-import { config } from '@/config'
+import { ordersApi, Order } from '@/api'
+
+interface OrderHistoryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  orders: Order[];
+}
 
 const formatDateTime = (isoString: string) => {
   // Parse the UTC time string and create a Date object
@@ -36,30 +42,6 @@ interface Store {
   items: OrderItem[];
 }
 
-interface Order {
-  id: string;
-  created: string;
-  status: string;
-  payment_status: string;
-  delivery_fee: number;
-  total_amount: number;
-  tax_amount: number;
-  delivery_address?: {
-    street_address: string[];
-    city: string;
-    state: string;
-    zip_code: string;
-  };
-  customer_phone?: string;
-  stores: Store[];
-}
-
-interface OrderHistoryModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  orders: Order[];
-}
-
 export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHistoryModalProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -71,17 +53,7 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/user/orders`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data = await response.json();
+        const data = await ordersApi.getUserOrders(user.token);
         setUserOrders(data);
       } catch (error) {
         console.error('Error fetching orders:', error);

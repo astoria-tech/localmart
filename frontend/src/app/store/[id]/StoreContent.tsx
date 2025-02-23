@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCart } from '../../contexts/cart';
+import { useCart } from '@/app/contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
@@ -9,26 +9,7 @@ import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon } from '@heroicons
 import { config } from '@/config';
 import { useStoreRoles } from '@/app/hooks/useStoreRoles';
 import Link from 'next/link';
-
-interface Store {
-  id: string;
-  name: string;
-  street_1: string;
-  street_2?: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  instagram?: string;
-  facebook?: string;
-  twitter?: string;
-}
-
-interface StoreItem {
-  id: string;
-  name: string;
-  price: number;
-  imageUrl?: string;
-}
+import { storesApi, Store, StoreItem } from '@/api';
 
 export default function StoreContent({ storeId }: { storeId: string }) {
   const { addItem } = useCart();
@@ -45,26 +26,9 @@ export default function StoreContent({ storeId }: { storeId: string }) {
   useEffect(() => {
     const fetchStoreAndItems = async () => {
       try {
-        // Fetch store details
-        const storeResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}`);
-        if (!storeResponse.ok) {
-          throw new Error('Failed to fetch store');
-        }
-        const storeData = await storeResponse.json();
-        setStore(storeData);
-
-        // Fetch store items
-        const itemsResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items`);
-        if (!itemsResponse.ok) {
-          throw new Error('Failed to fetch store items');
-        }
-        const itemsData = await itemsResponse.json();
-        // Add mock image URLs to items
-        const itemsWithImages = itemsData.map((item: StoreItem) => ({
-          ...item,
-          imageUrl: `https://picsum.photos/seed/${item.id}/400/300`
-        }));
-        setItems(itemsWithImages);
+        const storeWithItems = await storesApi.getStoreWithItems(storeId);
+        setStore(storeWithItems);
+        setItems(storeWithItems.items);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch store data');
       } finally {
