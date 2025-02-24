@@ -1,1 +1,5 @@
 volumes
+
+# GPG secrets directory - only track .gpg files
+gpg-secrets/*
+!gpg-secrets/*.gpg
