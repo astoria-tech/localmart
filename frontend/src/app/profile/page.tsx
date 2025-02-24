@@ -6,29 +6,10 @@ import { toast } from 'react-hot-toast';
 import { config } from '@/config';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+import { authApi, paymentApi, Profile, SavedCard } from '@/api';
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_KEY!);
-
-interface UserProfile {
-  first_name: string;
-  last_name: string;
-  phone_number: string;
-  street_1: string;
-  street_2: string;
-  city: string;
-  state: string;
-  zip: string;
-}
-
-interface SavedCard {
-  id: string;
-  last4: string;
-  brand: string;
-  exp_month: number;
-  exp_year: number;
-  isDefault: boolean;
-}
 
 // Card form component
 function CardForm({ onSuccess }: { onSuccess: () => void }) {
@@ -44,18 +25,7 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     try {
       // Get setup intent from backend
-      const setupResponse = await fetch(`${config.apiUrl}/api/v0/payment/setup-intent`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-        }
-      });
-
-      if (!setupResponse.ok) {
-        throw new Error('Failed to create setup intent');
-      }
-
-      const { clientSecret } = await setupResponse.json();
+      const { clientSecret } = await paymentApi.createSetupIntent(user.token);
 
       // Confirm card setup
       const result = await stripe.confirmCardSetup(clientSecret, {
@@ -71,21 +41,12 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
         throw new Error(result.error.message);
       }
 
-      // Notify backend of successful setup
-      const attachResponse = await fetch(`${config.apiUrl}/api/v0/payment/cards`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          payment_method_id: result.setupIntent!.payment_method,
-        }),
-      });
-
-      if (!attachResponse.ok) {
-        throw new Error('Failed to save card');
+      if (!result.setupIntent?.payment_method || typeof result.setupIntent.payment_method !== 'string') {
+        throw new Error('Invalid payment method');
       }
+
+      // Notify backend of successful setup
+      await paymentApi.attachCard(user.token, result.setupIntent.payment_method);
 
       toast.success('Card added successfully');
       onSuccess();
@@ -128,11 +89,7 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showCardForm, setShowCardForm] = useState(false);
-  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
-  const [profile, setProfile] = useState<UserProfile>({
+  const [profile, setProfile] = useState<Profile>({
     first_name: '',
     last_name: '',
     phone_number: '',
@@ -142,6 +99,10 @@ export default function ProfilePage() {
     state: '',
     zip: ''
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
 
   const formatPhoneNumber = (value: string) => {
     // Remove all non-digits
@@ -167,27 +128,8 @@ export default function ProfilePage() {
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-
-        const data = await response.json();
-        setProfile({
-          first_name: data.first_name || '',
-          last_name: data.last_name || '',
-          phone_number: data.phone_number || '',
-          street_1: data.street_1 || '',
-          street_2: data.street_2 || '',
-          city: data.city || '',
-          state: data.state || '',
-          zip: data.zip || ''
-        });
+        const data = await authApi.getProfile(user.token);
+        setProfile(data);
       } catch (error) {
         console.error('Error fetching profile:', error);
         toast.error('Failed to load profile');
@@ -203,30 +145,10 @@ export default function ProfilePage() {
     if (!user?.token) return;
 
     try {
-      const response = await fetch(`${config.apiUrl}/api/v0/payment/cards`, {
-        headers: {
-          'Authorization': `Bearer ${user.token}`
-        }
-      });
-
-      if (response.status === 404) {
-        // No cards is a valid state
-        setSavedCards([]);
-        return;
-      }
-
-      if (!response.ok) {
-        console.error('Error fetching cards:', response.status, response.statusText);
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error details:', errorData);
-        throw new Error('Failed to fetch cards');
-      }
-
-      const data = await response.json();
-      setSavedCards(Array.isArray(data) ? data : []);
+      const cards = await paymentApi.getCards(user.token);
+      setSavedCards(cards);
     } catch (error) {
       console.error('Error fetching cards:', error);
-      // Don't show error toast for no cards
       setSavedCards([]);
     }
   };
@@ -241,19 +163,7 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
-      const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(profile)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-
+      await authApi.updateProfile(user.token, profile);
       toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -267,17 +177,7 @@ export default function ProfilePage() {
     if (!user?.token) return;
 
     try {
-      const response = await fetch(`${config.apiUrl}/api/v0/payment/cards/${cardId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove card');
-      }
-
+      await paymentApi.deleteCard(user.token, cardId);
       toast.success('Card removed successfully');
       setSavedCards(cards => cards.filter(card => card.id !== cardId));
     } catch (error) {
@@ -505,18 +405,18 @@ export default function ProfilePage() {
             </div>
 
             {/* Add Card Section */}
-            {showCardForm ? (
+            {showAddCard ? (
               <Elements stripe={stripePromise}>
                 <CardForm
                   onSuccess={() => {
-                    setShowCardForm(false);
+                    setShowAddCard(false);
                     fetchCards();
                   }}
                 />
               </Elements>
             ) : (
               <button
-                onClick={() => setShowCardForm(true)}
+                onClick={() => setShowAddCard(true)}
                 type="button"
                 className="w-full flex items-center justify-center rounded-md border border-[#2A9D8F] bg-white px-4 py-2 text-sm font-medium text-[#2A9D8F] shadow-sm hover:bg-[#2A9D8F] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#2A9D8F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >

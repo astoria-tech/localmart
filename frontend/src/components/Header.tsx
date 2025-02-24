@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '../app/contexts/auth'
+import { useAuth, useIsAdmin } from '../app/contexts/auth'
 import { useCart } from '../app/contexts/cart'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
@@ -8,13 +8,15 @@ import OrderHistoryModal from './OrderHistoryModal'
 import CartModal from './CartModal'
 import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
 import { config } from '@/config'
+import { authApi, ordersApi, Order } from '@/api'
 
 export default function Header() {
   const { user, logout } = useAuth()
+  const isAdmin = useIsAdmin()
   const { totalItems } = useCart()
   const [showOrderHistory, setShowOrderHistory] = useState(false)
   const [showCart, setShowCart] = useState(false)
-  const [orders, setOrders] = useState([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [firstName, setFirstName] = useState('')
 
   useEffect(() => {
@@ -22,18 +24,7 @@ export default function Header() {
       if (!user?.token) return;
 
       try {
-        const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-
-        const data = await response.json();
-        console.log('Profile data:', data); // Debug log
+        const data = await authApi.getProfile(user.token);
         setFirstName(data.first_name || 'there');
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -47,33 +38,17 @@ export default function Header() {
   const handleShowOrderHistory = async () => {
     if (user) {
       try {
-        console.log('User token:', user.token?.slice(0, 20) + '...')  // Log first 20 chars of token
-        
-        const response = await fetch(`${config.apiUrl}/api/v0/orders`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Orders error response:', errorData)  // Log error response
-          throw new Error(errorData.detail || 'Failed to fetch orders');
-        }
-        
-        const data = await response.json()
-        console.log('Orders fetched:', data)  // Debug log
-        setOrders(data)
-        setShowOrderHistory(true)
+        const data = await ordersApi.getUserOrders(user.token);
+        setOrders(data);
+        setShowOrderHistory(true);
       } catch (error) {
-        console.error('Failed to fetch orders:', error)
+        console.error('Failed to fetch orders:', error);
       }
     }
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-50">
+    <header className="fixed top-0 left-0 right-0 bg-[#2A9D8F] text-white p-4 shadow-md z-30">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2 group">
@@ -82,20 +57,24 @@ export default function Header() {
           </Link>
           {user && (
             <>
-              <a
-                href={`${config.pocketbaseUrl}/_/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white/80 hover:text-white transition-colors ml-2"
-              >
-                database
-              </a>
-              <Link
-                href="/orders"
-                className="text-sm text-white/80 hover:text-white transition-colors ml-2"
-              >
-                orders
-              </Link>
+              {isAdmin && (
+                <>
+                  <a
+                    href={`${config.pocketbaseUrl}/_/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-white/80 hover:text-white transition-colors ml-2"
+                  >
+                    database
+                  </a>
+                  <Link
+                    href="/orders"
+                    className="text-sm text-white/80 hover:text-white transition-colors ml-2"
+                  >
+                    admin
+                  </Link>
+                </>
+              )}
             </>
           )}
         </div>

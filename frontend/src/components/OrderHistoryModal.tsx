@@ -1,9 +1,19 @@
 'use client';
 
 import { Dialog, Transition } from '@headlessui/react'
-import { Fragment } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { formatCurrency } from '@/utils/currency'
-import { ClockIcon, MapPinIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline'
+import { ClockIcon } from '@heroicons/react/24/outline'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/app/contexts/auth'
+import { toast } from 'react-hot-toast'
+import { ordersApi, Order } from '@/api'
+
+interface OrderHistoryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  orders: Order[];
+}
 
 const formatDateTime = (isoString: string) => {
   // Parse the UTC time string and create a Date object
@@ -32,31 +42,32 @@ interface Store {
   items: OrderItem[];
 }
 
-interface Order {
-  id: string;
-  created: string;
-  status: string;
-  payment_status: string;
-  delivery_fee: number;
-  total_amount: number;
-  tax_amount: number;
-  delivery_address?: {
-    street_address: string[];
-    city: string;
-    state: string;
-    zip_code: string;
-  };
-  customer_phone?: string;
-  stores: Store[];
-}
-
-interface OrderHistoryModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  orders: Order[];
-}
-
 export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHistoryModalProps) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user?.token) return;
+
+      try {
+        const data = await ordersApi.getUserOrders(user.token);
+        setUserOrders(data);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        toast.error('Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isOpen && user) {
+      fetchOrders();
+    }
+  }, [isOpen, user]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -106,6 +117,11 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
     return labels[status] || status.charAt(0).toUpperCase() + status.slice(1)
   }
 
+  const handleOrderClick = (orderId: string) => {
+    onClose();
+    router.push(`/orders/${orderId}`);
+  };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -140,108 +156,68 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
                   Order History
                 </Dialog.Title>
 
-                <div className="space-y-6">
-                  {orders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="bg-white/80 backdrop-blur-sm rounded-lg p-6 hover:shadow-md transition-shadow"
-                    >
-                      {/* Order Header */}
-                      <div className="flex justify-between items-start border-b border-[#2A9D8F]/10 pb-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-[#2D3748]">Order #{order.id.slice(-6)}</p>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
-                            >
-                              {getStatusLabel(order.status)}
-                            </span>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}
-                            >
-                              {getPaymentStatusLabel(order.payment_status)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-sm text-[#4A5568]">
-                            <ClockIcon className="w-4 h-4" />
-                            <time dateTime={order.created}>
-                              {formatDateTime(order.created)}
-                            </time>
-                          </div>
-                        </div>
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-32 bg-white/50 rounded-lg"></div>
                       </div>
-
-                      {/* Delivery Address Section */}
-                      <div className="mb-4">
-                        <h4 className="font-medium text-[#2D3748] mb-2">Delivery Address</h4>
-                        <div className="flex items-start gap-2 text-sm text-[#4A5568]">
-                          <MapPinIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {userOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        onClick={() => handleOrderClick(order.id)}
+                        className="bg-white/80 backdrop-blur-sm rounded-lg p-6 hover:shadow-md transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between">
                           <div>
-                            {order.delivery_address ? (
-                              <>
-                                <p>{order.delivery_address.street_address.filter(Boolean).join(', ')}</p>
-                                <p>{order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}</p>
-                              </>
-                            ) : (
-                              <p className="italic">No address available</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Order Items by Store */}
-                      <div className="space-y-4 border-t border-[#2A9D8F]/10 pt-4">
-                        {order.stores.map((store) => (
-                          <div key={store.store.id}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <BuildingStorefrontIcon className="w-4 h-4 text-[#2A9D8F]" />
-                              <h4 className="font-medium text-[#2D3748]">{store.store.name}</h4>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-[#2D3748]">Order #{order.id.slice(-6)}</p>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                              >
+                                {getStatusLabel(order.status)}
+                              </span>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}
+                              >
+                                {getPaymentStatusLabel(order.payment_status)}
+                              </span>
                             </div>
-                            <div className="bg-white/50 rounded-lg p-3">
-                              {store.items.map((item) => (
-                                <div key={item.id} className="flex justify-between py-1 text-sm">
-                                  <div className="flex gap-2">
-                                    <span className="text-[#4A5568] font-medium">{item.quantity}×</span>
-                                    <span className="text-[#2D3748]">{item.name}</span>
-                                  </div>
-                                  <span className="text-[#4A5568]">{formatCurrency(item.price * item.quantity)}</span>
-                                </div>
-                              ))}
+                            <div className="flex items-center gap-2 mt-1 text-sm text-[#4A5568]">
+                              <ClockIcon className="w-4 h-4" />
+                              <time dateTime={order.created}>
+                                {formatDateTime(order.created)}
+                              </time>
                             </div>
                           </div>
-                        ))}
-                      </div>
-
-                      {/* Price Breakdown */}
-                      <div className="mt-4 space-y-2 text-sm border-t border-[#2A9D8F]/10 pt-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#4A5568]">Subtotal</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.stores.reduce((acc, store) => 
-                            acc + store.items.reduce((itemAcc, item) => itemAcc + (item.price * item.quantity), 0), 0
-                          ))}</span>
+                          <div className="text-right">
+                            <p className="text-sm text-[#4A5568]">Total</p>
+                            <p className="font-medium text-[#2D3748]">{formatCurrency(order.total_amount)}</p>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#4A5568]">Tax</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.tax_amount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#4A5568]">Delivery Fee</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.delivery_fee)}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-2 border-t border-[#2A9D8F]/10 font-medium">
-                          <span className="text-[#2D3748]">Total</span>
-                          <span className="text-[#2D3748]">{formatCurrency(order.total_amount)}</span>
+                        <div className="mt-2 text-sm text-[#4A5568]">
+                          {order.stores.map((store) => (
+                            <div key={store.store.id} className="flex items-center gap-1">
+                              <span className="font-medium">{store.store.name}</span>
+                              <span>•</span>
+                              <span>{store.items.length} {store.items.length === 1 ? 'item' : 'items'}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  {orders.length === 0 && (
-                    <div className="text-center py-8 text-[#4A5568]">
-                      <p>No orders found</p>
-                    </div>
-                  )}
-                </div>
+                    {userOrders.length === 0 && (
+                      <div className="text-center py-8 text-[#4A5568]">
+                        <p>No orders found</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-6">
                   <button

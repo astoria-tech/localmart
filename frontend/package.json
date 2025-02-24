@@ -13,16 +13,20 @@
     "@heroicons/react": "^2.2.0",
     "@stripe/react-stripe-js": "^3.1.1",
     "@stripe/stripe-js": "^5.6.0",
+    "leaflet": "^1.9.4",
     "next": "15.1.5",
     "pocketbase": "^0.25.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.1",
-    "react-icons": "^5.4.0"
+    "react-icons": "^5.4.0",
+    "react-leaflet": "^5.0.0",
+    "recharts": "^2.15.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@types/leaflet": "^1.9.16",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

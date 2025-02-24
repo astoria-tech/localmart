@@ -15,6 +15,7 @@ from pocketbase import Client
 
 from .uber_direct import UberDirectClient
 from .pocketbase_service import PocketBaseService
+from .config import Config
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -26,9 +27,9 @@ logger.info(f"Initializing PocketBase with URL: {POCKETBASE_URL}")
 pb_service = PocketBaseService(POCKETBASE_URL)
 
 # Get Uber Direct credentials from environment
-UBER_CUSTOMER_ID = os.getenv('LOCALMART_UBER_DIRECT_CUSTOMER_ID')
-UBER_CLIENT_ID = os.getenv('LOCALMART_UBER_DIRECT_CLIENT_ID')
-UBER_CLIENT_SECRET = os.getenv('LOCALMART_UBER_DIRECT_CLIENT_SECRET')
+UBER_CUSTOMER_ID = Config.UBER_CUSTOMER_ID
+UBER_CLIENT_ID = Config.UBER_CLIENT_ID
+UBER_CLIENT_SECRET = Config.UBER_CLIENT_SECRET
 
 # Initialize Uber Direct client
 uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SECRET)
@@ -37,19 +38,28 @@ uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SEC
 active_deliveries: Set[str] = set()
 
 # Initialize Stripe
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+stripe.api_key = Config.STRIPE_SECRET_KEY
 
 # Initialize Stripe webhook secret
-STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
+STRIPE_WEBHOOK_SECRET = Config.STRIPE_WEBHOOK_SECRET
 
 @contextmanager
-def user_auth_context(token: str):
-    """Context manager to handle user authentication state"""
+def user_auth_context(token: Optional[str]):
+    """Context manager to handle user authentication for PocketBase operations"""
+    if not token:
+        raise HTTPException(status_code=401, detail="No authorization token")
+    
     try:
-        pb_service.set_token(token)
-        yield
-    finally:
-        pb_service.clear_token()
+        # Verify the user's token
+        token = token.split(' ')[1] if token.startswith('Bearer ') else token
+        user = pb_service.get_user_from_token(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        yield user
+    except Exception as e:
+        logger.error(f"Auth error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 def get_token_from_request(request: Request) -> str:
     """Extract and validate the auth token from a request"""
@@ -91,6 +101,11 @@ class DeliveryQuoteRequest(BaseModel):
     store_id: str
     item_id: str
     delivery_address: Dict
+
+class StoreItem(BaseModel):
+    name: str
+    price: float
+    description: Optional[str] = None
 
 app = FastAPI(
     title="LocalMart Backend",
@@ -235,63 +250,68 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
 async def create_order(request: Dict):
     """Create a new order with basic status tracking"""
     try:
-        # Get the payment method
-        payment_method = pb_service.get_one('payment_methods', request['payment_method_id'])
-        if not payment_method:
-            raise HTTPException(status_code=400, detail="Invalid payment method")
+        # Get the payment method within the user's auth context
+        with user_auth_context(request.get('token')) as user:
+            payment_method = pb_service.get_one('payment_methods', request['payment_method_id'])
+            if not payment_method:
+                raise HTTPException(status_code=400, detail="Invalid payment method")
 
-        # Get the customer
-        customers = pb_service.get_list(
-            'stripe_customers',
-            query_params={"filter": f'user = "{request["user_id"]}"'}
-        )
-        if not customers.items:
-            raise HTTPException(status_code=400, detail="No Stripe customer found")
-        
-        stripe_customer_id = customers.items[0].stripe_customer_id
+            # Get the customer
+            customers = pb_service.get_list(
+                'stripe_customers',
+                query_params={"filter": f'user = "{request["user_id"]}"'}
+            )
+            if not customers.items:
+                raise HTTPException(status_code=400, detail="No Stripe customer found")
+            
+            stripe_customer_id = customers.items[0].stripe_customer_id
 
-        # Create a payment intent
-        payment_intent = stripe.PaymentIntent.create(
-            amount=int(request['total_amount'] * 100),  # Convert to cents
-            currency='usd',
-            customer=stripe_customer_id,
-            payment_method=payment_method.stripe_payment_method_id,
-            off_session=True,
-            confirm=True,
-        )
+            # Create a payment intent
+            payment_intent = stripe.PaymentIntent.create(
+                amount=int(request['total_amount'] * 100),  # Convert to cents
+                currency='usd',
+                customer=stripe_customer_id,
+                payment_method=payment_method.stripe_payment_method_id,
+                off_session=True,
+                confirm=True,
+            )
 
-        # Create the order in PocketBase with simplified fields
-        order = pb_service.create('orders', {
-            'user': request['user_id'],
-            'store': request['store_id'],
-            'status': 'pending',  # Initial status
-            'payment_status': 'pending',  # Initial payment status
-            'payment_method': payment_method.id,  # Link to payment method
-            'stripe_payment_intent_id': payment_intent.id,
-            'subtotal_amount': request['subtotal_amount'],
-            'tax_amount': request['tax_amount'],
-            'delivery_fee': request['delivery_fee'],
-            'total_amount': request['total_amount'],
-            'delivery_address': request['delivery_address'],
-            'customer_notes': request.get('customer_notes', ''),
-        })
-
-        # Create order items
-        for item in request['items']:
-            pb_service.create('order_items', {
-                'order': order.id,
-                'store_item': item['store_item_id'],
-                'quantity': item['quantity'],
-                'price_at_time': item['price'],
-                'total_price': item['price'] * item['quantity']
+            # Create the order in PocketBase with simplified fields
+            order = pb_service.create('orders', {
+                'user': request['user_id'],
+                'store': request['store_id'],
+                'status': 'pending',  # Initial status
+                'payment_status': 'pending',  # Initial payment status
+                'payment_method': payment_method.id,  # Link to payment method
+                'stripe_payment_intent_id': payment_intent.id,
+                'subtotal_amount': request['subtotal_amount'],
+                'tax_amount': request['tax_amount'],
+                'delivery_fee': request['delivery_fee'],
+                'total_amount': request['total_amount'],
+                'delivery_address': {
+                    **request['delivery_address'],
+                    'customer_name': f"{user.first_name} {user.last_name}".strip(),
+                    'customer_phone': getattr(user, 'phone_number', None)
+                },
+                'customer_notes': request.get('customer_notes', ''),
             })
 
-        return {
-            'order_id': order.id,
-            'status': 'pending',
-            'payment_intent_client_secret': payment_intent.client_secret,
-            'message': 'Order created successfully'
-        }
+            # Create order items
+            for item in request['items']:
+                pb_service.create('order_items', {
+                    'order': order.id,
+                    'store_item': item['store_item_id'],
+                    'quantity': item['quantity'],
+                    'price_at_time': item['price'],
+                    'total_price': item['price'] * item['quantity']
+                })
+
+            return {
+                'order_id': order.id,
+                'status': 'pending',
+                'payment_intent_client_secret': payment_intent.client_secret,
+                'message': 'Order created successfully'
+            }
 
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error creating order: {str(e)}")
@@ -304,20 +324,23 @@ async def create_order(request: Dict):
         )
 
 @app.get("/api/v0/orders", response_model=List[Dict])
-async def get_user_orders(request: Request):
-    """Get orders for the authenticated user"""
+async def get_all_orders(request: Request):
+    """Get all orders (admin only)"""
     token = get_token_from_request(request)
     decoded_token = decode_jwt(token)
-    user_id = decoded_token['id']
+
+    # Verify user is admin
+    user = pb_service.get_user_from_token(token)
+    if not 'admin' in (getattr(user, 'roles', []) or []):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     with user_auth_context(token):
-        # Get user's orders
+        # Get all orders
         orders = pb_service.get_list(
             'orders',
             query_params={
-                "filter": f'user = "{user_id}"',
                 "sort": "-created",
-                "expand": "order_items(order).store_item,order_items(order).store_item.store,user"
+                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store"
             }
         )
 
@@ -328,7 +351,7 @@ async def get_user_orders(request: Request):
             stores_dict = {}
 
             # Get all order items for this order
-            order_items = order.expand.get('order_items(order)', [])
+            order_items = order.expand.get('order_items_via_order', [])
 
             for item in order_items:
                 if not hasattr(item, 'expand') or not item.expand.get('store_item'):
@@ -357,18 +380,7 @@ async def get_user_orders(request: Request):
                     'price': item.price_at_time
                 })
 
-            # Get user info from expanded user record
-            user = order.expand.get('user', {})
-            customer_name = f"{user.first_name} {user.last_name}".strip() if user else "Unknown"
-            
-            # Format user's address
-            delivery_address = {
-                'street_address': [user.street_1] + ([user.street_2] if user.street_2 else []),
-                'city': user.city,
-                'state': user.state,
-                'zip_code': user.zip,
-                'country': 'US'
-            } if user else None
+            delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
 
             formatted_order = {
                 'id': order.id,
@@ -378,8 +390,77 @@ async def get_user_orders(request: Request):
                 'delivery_fee': order.delivery_fee,
                 'total_amount': order.total_amount,
                 'tax_amount': order.tax_amount,
-                'customer_name': customer_name,
-                'customer_phone': getattr(user, 'phone_number', None),
+                'delivery_address': delivery_address,
+                'stores': list(stores_dict.values())
+            }
+            formatted_orders.append(formatted_order)
+
+        return formatted_orders
+
+@app.get("/api/v0/user/orders", response_model=List[Dict])
+async def get_user_orders(request: Request):
+    """Get orders for the authenticated user"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    with user_auth_context(token):
+        # Get user's orders
+        orders = pb_service.get_list(
+            'orders',
+            query_params={
+                "filter": f'user = "{user_id}"',
+                "sort": "-created",
+                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store"
+            }
+        )
+
+        # Format orders for response
+        formatted_orders = []
+        for order in orders.items:
+            # Group items by store
+            stores_dict = {}
+
+            # Get all order items for this order
+            order_items = order.expand.get('order_items_via_order', [])
+
+            for item in order_items:
+                if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                    continue
+
+                store_item = item.expand['store_item']
+                if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                    continue
+
+                store = store_item.expand['store']
+                store_id = store.id
+
+                if store_id not in stores_dict:
+                    stores_dict[store_id] = {
+                        'store': {
+                            'id': store.id,
+                            'name': store.name
+                        },
+                        'items': []
+                    }
+
+                stores_dict[store_id]['items'].append({
+                    'id': item.id,
+                    'name': store_item.name,
+                    'quantity': item.quantity,
+                    'price': item.price_at_time
+                })
+
+            delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
+
+            formatted_order = {
+                'id': order.id,
+                'created': order.created,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'delivery_fee': order.delivery_fee,
+                'total_amount': order.total_amount,
+                'tax_amount': order.tax_amount,
                 'delivery_address': delivery_address,
                 'stores': list(stores_dict.values())
             }
@@ -464,6 +545,7 @@ async def signup(user: UserSignup):
                 "email": auth_data.record.email,
                 "first_name": auth_data.record.first_name,
                 "last_name": auth_data.record.last_name,
+                "roles": getattr(auth_data.record, 'roles', []),
             }
         }
     except Exception as e:
@@ -491,6 +573,7 @@ async def login(user: UserLogin):
                 "email": auth_data.record.email,
                 "first_name": auth_data.record.first_name,
                 "last_name": auth_data.record.last_name,
+                "roles": getattr(auth_data.record, 'roles', []),
             }
         }
     except Exception as e:
@@ -586,11 +669,13 @@ def serialize_store(store) -> Dict:
     }
 
 def serialize_store_item(item) -> Dict:
-    """Extract item fields from a store item record"""
+    """Enhanced serializer for store items"""
     return {
-        "id": item.id,
-        "name": item.name,
-        "price": item.price
+        'id': item.id,
+        'name': item.name,
+        'price': float(item.price),
+        'description': item.description if hasattr(item, 'description') else None,
+        'store': item.store
     }
 
 @app.post("/api/v0/payment/setup-intent")
@@ -829,3 +914,215 @@ async def stripe_webhook(request: Request):
             logger.error(json.dumps(payment_intent, indent=2))
 
     return {"status": "success"}
+
+@app.get("/api/v0/stores/{store_id}/roles", response_model=Dict)
+async def get_store_roles(store_id: str, request: Request):
+    """Get the current user's roles for a specific store"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    with user_auth_context(token):
+        try:
+            # Check if user is a global admin first
+            user = pb_service.get_user_from_token(token)
+            if 'admin' in (getattr(user, 'roles', []) or []):
+                return {"roles": ["admin"]}
+
+            # Get store roles for this user and store
+            store_roles = pb_service.get_list(
+                'store_roles',
+                query_params={
+                    "filter": f'user = "{user_id}" && store = "{store_id}"',
+                    "expand": "role"
+                }
+            )
+            
+            roles = [sr.role for sr in store_roles.items]
+            return {"roles": roles}
+        except Exception as e:
+            logger.error(f"Error fetching store roles: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch store roles: {str(e)}"
+            )
+
+@app.get("/api/v0/stores/{store_id}/orders", response_model=List[Dict])
+async def get_store_orders(store_id: str, request: Request):
+    """Get orders for a specific store (requires store admin role)"""
+    token = get_token_from_request(request)
+    decoded_token = decode_jwt(token)
+    user_id = decoded_token['id']
+
+    with user_auth_context(token):
+        try:
+            # Check if user is a global admin or store admin
+            user = pb_service.get_user_from_token(token)
+            is_global_admin = 'admin' in (getattr(user, 'roles', []) or [])
+            
+            if not is_global_admin:
+                # Check store roles
+                store_roles = pb_service.get_list(
+                    'store_roles',
+                    query_params={
+                        "filter": f'user = "{user_id}" && store = "{store_id}" && role = "admin"'
+                    }
+                )
+                
+                if not store_roles.items:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You don't have permission to view this store's orders"
+                    )
+
+            # Get all orders with expanded order items and store items
+            orders = pb_service.get_list(
+                'orders',
+                query_params={
+                    "sort": "-created",
+                    "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store",
+                    "filter": f'order_items_via_order.store_item.store = "{store_id}"'
+                }
+            )
+
+            # Format orders for response
+            formatted_orders = []
+            for order in orders.items:
+                stores_dict = {}
+                order_items = order.expand.get('order_items_via_order', [])
+
+                # Process items for this store
+                for item in order_items:
+                    if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                        continue
+
+                    store_item = item.expand['store_item']
+                    if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                        continue
+
+                    store = store_item.expand['store']
+                    store_id_key = store.id
+                    if store_id_key not in stores_dict:
+                        stores_dict[store_id_key] = {
+                            'store': {
+                                'id': store.id,
+                                'name': store.name
+                            },
+                            'items': []
+                        }
+
+                    stores_dict[store_id_key]['items'].append({
+                        'id': item.id,
+                        'name': store_item.name,
+                        'quantity': item.quantity,
+                        'price': item.price_at_time
+                    })
+
+                delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
+
+                formatted_order = {
+                    'id': order.id,
+                    'created': order.created,
+                    'status': order.status,
+                    'payment_status': order.payment_status,
+                    'delivery_fee': order.delivery_fee,
+                    'total_amount': order.total_amount,
+                    'tax_amount': order.tax_amount,
+                    'delivery_address': delivery_address,
+                    'stores': list(stores_dict.values())
+                }
+                formatted_orders.append(formatted_order)
+
+            return formatted_orders
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching store orders: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch store orders: {str(e)}"
+            )
+
+@app.post("/api/v0/stores/{store_id}/items", response_model=Dict)
+async def create_store_item(store_id: str, item: StoreItem, request: Request):
+    try:
+        token = get_token_from_request(request)
+        with user_auth_context(token) as user:
+            # Check if user has admin role for the store or is a global admin
+            if not 'admin' in user.roles:
+                store_roles = pb_service.pb.collection('store_roles').get_list(
+                    1, 1, 
+                    query_params={
+                        "filter": f'user="{user.id}" && store="{store_id}" && role="admin"'
+                    }
+                )
+                if not store_roles.items:
+                    raise HTTPException(status_code=403, detail="Not authorized to manage store items")
+
+            # Create the item
+            new_item = pb_service.pb.collection('store_items').create({
+                'name': item.name,
+                'price': item.price,
+                'description': item.description,
+                'store': store_id
+            })
+
+            return serialize_store_item(new_item)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.patch("/api/v0/stores/{store_id}/items/{item_id}", response_model=Dict)
+async def update_store_item(store_id: str, item_id: str, item: StoreItem, request: Request):
+    token = get_token_from_request(request)
+    with user_auth_context(token) as user:
+        # Check if user has admin role for the store or is a global admin
+        if not 'admin' in user.roles:
+            store_roles = pb_service.pb.collection('store_roles').get_list(
+                1, 1, 
+                query_params={
+                    "filter": f'user="{user.id}" && store="{store_id}" && role="admin"'
+                }
+            )
+            if not store_roles.items:
+                raise HTTPException(status_code=403, detail="Not authorized to manage store items")
+
+        # Verify item belongs to store
+        existing_item = pb_service.pb.collection('store_items').get_one(item_id)
+        if existing_item.store != store_id:
+            raise HTTPException(status_code=404, detail="Item not found in store")
+
+        # Update the item
+        updated_item = pb_service.pb.collection('store_items').update(item_id, {
+            'name': item.name,
+            'price': item.price,
+            'description': item.description
+        })
+
+        return serialize_store_item(updated_item)
+
+@app.delete("/api/v0/stores/{store_id}/items/{item_id}")
+async def delete_store_item(store_id: str, item_id: str, request: Request):
+    try:
+        token = get_token_from_request(request)
+        with user_auth_context(token) as user:
+            # Check if user has admin role for the store or is a global admin
+            if not 'admin' in user.roles:
+                store_roles = pb_service.pb.collection('store_roles').get_list(
+                    1, 1, 
+                    query_params={
+                        "filter": f'user="{user.id}" && store="{store_id}" && role="admin"'
+                    }
+                )
+                if not store_roles.items:
+                    raise HTTPException(status_code=403, detail="Not authorized to manage store items")
+
+            # Verify item belongs to store
+            existing_item = pb_service.pb.collection('store_items').get_one(item_id)
+            if existing_item.store != store_id:
+                raise HTTPException(status_code=404, detail="Item not found in store")
+
+            # Delete the item
+            pb_service.pb.collection('store_items').delete(item_id)
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

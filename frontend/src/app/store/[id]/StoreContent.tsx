@@ -1,35 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCart } from '../../contexts/cart';
+import { useCart } from '@/app/contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
-import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon } from '@heroicons/react/24/outline';
 import { config } from '@/config';
-
-interface Store {
-  id: string;
-  name: string;
-  street_1: string;
-  street_2?: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  instagram?: string;
-  facebook?: string;
-  twitter?: string;
-}
-
-interface StoreItem {
-  id: string;
-  name: string;
-  price: number;
-  imageUrl?: string;
-}
+import { useStoreRoles } from '@/app/hooks/useStoreRoles';
+import Link from 'next/link';
+import { storesApi, Store, StoreItem } from '@/api';
 
 export default function StoreContent({ storeId }: { storeId: string }) {
   const { addItem } = useCart();
+  const { isAdmin } = useStoreRoles(storeId);
   const [store, setStore] = useState<Store | null>(null);
   const [items, setItems] = useState<StoreItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,26 +26,9 @@ export default function StoreContent({ storeId }: { storeId: string }) {
   useEffect(() => {
     const fetchStoreAndItems = async () => {
       try {
-        // Fetch store details
-        const storeResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}`);
-        if (!storeResponse.ok) {
-          throw new Error('Failed to fetch store');
-        }
-        const storeData = await storeResponse.json();
-        setStore(storeData);
-
-        // Fetch store items
-        const itemsResponse = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/items`);
-        if (!itemsResponse.ok) {
-          throw new Error('Failed to fetch store items');
-        }
-        const itemsData = await itemsResponse.json();
-        // Add mock image URLs to items
-        const itemsWithImages = itemsData.map((item: StoreItem) => ({
-          ...item,
-          imageUrl: `https://picsum.photos/seed/${item.id}/400/300`
-        }));
-        setItems(itemsWithImages);
+        const storeWithItems = await storesApi.getStoreWithItems(storeId);
+        setStore(storeWithItems);
+        setItems(storeWithItems.items);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch store data');
       } finally {
@@ -105,15 +72,34 @@ export default function StoreContent({ storeId }: { storeId: string }) {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
-      <div className="bg-white/50 backdrop-blur-sm border-b pt-16">
+      <div className="bg-white/50 backdrop-blur-sm border-b pt-24">
         <div className="h-32 bg-gradient-to-r from-[#2A9D8F]/10 to-[#2A9D8F]/5 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-5"></div>
           <div className="container mx-auto px-4 h-full">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between h-full py-6">
               {/* Store Name and Type */}
-              <div>
+              <div className="relative z-10">
                 <h1 className="text-2xl font-bold text-[#2D3748]">{store.name}</h1>
                 <p className="text-[#4A5568] text-sm">Local market & grocery</p>
+                {/* Vendor Links */}
+                {isAdmin && (
+                  <div className="flex items-center gap-4 mt-2">
+                    <Link
+                      href={`/store/${storeId}/dashboard`}
+                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1"
+                    >
+                      <ChartBarIcon className="w-4 h-4" />
+                      <span>View Orders</span>
+                    </Link>
+                    <Link
+                      href={`/store/${storeId}/inventory`}
+                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1"
+                    >
+                      <ShoppingBagIcon className="w-4 h-4" />
+                      <span>Manage Inventory</span>
+                    </Link>
+                  </div>
+                )}
                 {/* Social Links */}
                 <div className="flex gap-3 mt-3">
                   <a

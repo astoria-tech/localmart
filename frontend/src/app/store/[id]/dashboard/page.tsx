@@ -2,28 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
+import { useStoreRoles } from '@/app/hooks/useStoreRoles';
 import { toast } from 'react-hot-toast';
 import { config } from '@/config';
+import { useRouter } from 'next/navigation';
+import { use } from 'react';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useRouter } from 'next/navigation';
-import { ordersApi, Order } from '@/api';
+import Link from 'next/link';
+import { storesApi, ordersApi, Order } from '@/api';
 
 interface OrderItem {
   id: string;
   name: string;
   quantity: number;
   price: number;
+}
+
+interface Store {
   store: {
     id: string;
     name: string;
   };
+  items: OrderItem[];
 }
 
 interface DailyCount {
   date: string;
   timestamp: number;
-  [storeId: string]: string | number; // Allow string indexes for store IDs
+  [itemName: string]: string | number; // Allow string indexes for item names
 }
 
 const statusColors = {
@@ -31,15 +38,15 @@ const statusColors = {
   confirmed: 'bg-blue-100 text-blue-800',
   picked_up: 'bg-purple-100 text-purple-800',
   delivered: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
+  cancelled: 'bg-red-100 text-red-800'
 };
 
 const statusLabels = {
-  pending: 'Delivery Pending',
-  confirmed: 'Confirmed',
+  pending: 'Pickup Pending',
+  confirmed: 'Pickup Confirmed',
   picked_up: 'Picked Up',
   delivered: 'Delivered',
-  cancelled: 'Cancelled',
+  cancelled: 'Cancelled'
 };
 
 const paymentStatusColors = {
@@ -47,28 +54,27 @@ const paymentStatusColors = {
   processing: 'bg-blue-100 text-blue-800',
   succeeded: 'bg-green-100 text-green-800',
   failed: 'bg-red-100 text-red-800',
-  refunded: 'bg-gray-100 text-gray-800',
+  refunded: 'bg-gray-100 text-gray-800'
 };
 
 const paymentStatusLabels = {
-  pending: 'Pending',
+  pending: 'Payment Pending',
   processing: 'Processing',
-  succeeded: 'Succeeded',
+  succeeded: 'Paid',
   failed: 'Failed',
-  refunded: 'Refunded',
+  refunded: 'Refunded'
 };
 
-const formatDateTime = (isoString: string) => {
-  // Parse the UTC time string and create a Date object
-  const utcDate = new Date(isoString + 'Z'); // Ensure UTC interpretation by appending Z
-  
-  // Format in local timezone
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }).format(utcDate);
-};
+function formatDateTime(isoString: string) {
+  return new Date(isoString).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: true
+  });
+}
 
 function calculateMetrics(orders: Order[]) {
   const totalOrders = orders.length;
@@ -76,12 +82,65 @@ function calculateMetrics(orders: Order[]) {
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+  // Calculate items per order
+  const totalItems = orders.reduce((sum, order) => {
+    return sum + order.stores[0]?.items.reduce((itemSum, item) => itemSum + item.quantity, 0) || 0;
+  }, 0);
+  const avgItemsPerOrder = totalOrders > 0 ? totalItems / totalOrders : 0;
+
+  // Calculate popular items
+  const itemCounts: { [key: string]: { count: number; revenue: number; name: string } } = {};
+  orders.forEach(order => {
+    order.stores[0]?.items.forEach(item => {
+      if (!itemCounts[item.name]) {
+        itemCounts[item.name] = { count: 0, revenue: 0, name: item.name };
+      }
+      itemCounts[item.name].count += item.quantity;
+      itemCounts[item.name].revenue += item.price * item.quantity;
+    });
+  });
+
+  const popularItems = Object.entries(itemCounts)
+    .map(([name, data]) => ({ id: name, ...data }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  // Calculate week-over-week growth
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  const thisWeekRevenue = orders
+    .filter(order => new Date(order.created) >= oneWeekAgo)
+    .reduce((sum, order) => sum + order.total_amount, 0);
+
+  const lastWeekRevenue = orders
+    .filter(order => {
+      const date = new Date(order.created);
+      return date >= twoWeeksAgo && date < oneWeekAgo;
+    })
+    .reduce((sum, order) => sum + order.total_amount, 0);
+
+  const weekOverWeekGrowth = lastWeekRevenue > 0 
+    ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 
+    : 0;
+
   return {
     totalOrders,
     totalRevenue,
     pendingOrders,
-    avgOrderValue
+    avgOrderValue,
+    avgItemsPerOrder,
+    popularItems,
+    weekOverWeekGrowth,
+    thisWeekRevenue,
+    lastWeekRevenue
   };
+}
+
+function getStoreColor(index: number, opacity: number = 0.8) {
+  const hue = (166 + index * 30) % 360;
+  return `hsla(${hue}, 85%, 35%, ${opacity})`;
 }
 
 function calculateDailyOrderCounts(orders: Order[]) {
@@ -97,87 +156,109 @@ function calculateDailyOrderCounts(orders: Order[]) {
     return date;
   });
 
-  // Get unique stores from all orders
-  const storeIds = new Set<string>();
-  const storeNames = new Map<string, string>();
+  // Get unique items from all orders
+  const uniqueItems = new Set<string>();
   orders.forEach(order => {
-    order.stores.forEach(store => {
-      storeIds.add(store.store.id);
-      storeNames.set(store.store.id, store.store.name);
+    order.stores[0]?.items.forEach(item => {
+      uniqueItems.add(item.name);
     });
   });
 
-  // Initialize counts for each day with store-specific counts
+  // Initialize counts for each day
   const dailyCounts: DailyCount[] = days.map(date => {
     const baseCount = {
       date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       timestamp: date.getTime()
     };
 
-    // Add a count property for each store, initialized to 0
-    const storeCounts: { [key: string]: number } = {};
-    storeIds.forEach(storeId => {
-      storeCounts[storeId] = 0;
+    // Add a count property for each unique item, initialized to 0
+    const itemCounts: { [key: string]: number } = {};
+    uniqueItems.forEach(itemName => {
+      itemCounts[itemName] = 0;
     });
 
     return {
       ...baseCount,
-      ...storeCounts
+      ...itemCounts
     };
   });
 
-  // Count orders for each day and store
+  // Count items for each day
   orders.forEach(order => {
     const orderDate = new Date(order.created);
     const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const dayData = dailyCounts.find(d => d.date === orderDateStr);
     
     if (dayData) {
-      order.stores.forEach(store => {
-        const currentCount = dayData[store.store.id] as number;
-        dayData[store.store.id] = currentCount + 1;
+      order.stores[0]?.items.forEach(item => {
+        dayData[item.name] = (dayData[item.name] as number || 0) + item.quantity;
       });
     }
   });
 
-  // Convert storeIds to array for consistent ordering
-  const storeIdsArray = Array.from(storeIds);
+  // Sort dailyCounts by timestamp to ensure chronological order
+  dailyCounts.sort((a, b) => a.timestamp - b.timestamp);
 
   return {
     data: dailyCounts,
-    stores: storeIdsArray.map(id => ({
-      id,
-      name: storeNames.get(id) || 'Unknown Store'
-    }))
+    items: Array.from(uniqueItems)
   };
 }
 
-// Add color generation function
-function getStoreColor(index: number, opacity: number = 0.9) {
-  const hue = (166 + index * 30) % 360;
-  return `hsla(${hue}, 85%, 35%, ${opacity})`;
-}
-
-export default function OrdersDashboard() {
+export default function StoreDashboard({ params }: { params: Promise<{ id: string }> }) {
+  const { id: storeId } = use(params);
   const { user } = useAuth();
+  const { isAdmin, loading: rolesLoading } = useStoreRoles(storeId);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [store, setStore] = useState<{ name: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(Object.keys(statusLabels)));
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
 
   const metrics = calculateMetrics(orders);
 
-  // Filter orders based on selected statuses and search term
-  const filteredOrders = orders.filter(order => {
-    const matchesStatus = selectedStatuses.has(order.status);
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || 
-      order.id.toLowerCase().includes(searchLower) ||
-      order.delivery_address?.customer_name.toLowerCase().includes(searchLower);
-    return matchesStatus && matchesSearch;
-  });
+  useEffect(() => {
+    // Only redirect if we're done loading roles, have a user, and we're not an admin
+    if (!rolesLoading && user && !isAdmin) {
+      router.push(`/store/${storeId}`);
+      toast.error("You don't have permission to access this page");
+    }
+  }, [isAdmin, rolesLoading, router, storeId, user]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user?.token) return;
+
+      try {
+        const orders = await storesApi.getStoreOrders(user.token, storeId);
+        setOrders(orders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch orders');
+      }
+    };
+
+    const fetchStore = async () => {
+      try {
+        const store = await storesApi.getStore(storeId);
+        setStore(store);
+      } catch (error) {
+        console.error('Error fetching store:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch store');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAdmin) {
+      fetchOrders();
+      fetchStore();
+    }
+  }, [storeId, isAdmin, user]);
 
   // Toggle status filter
   const toggleStatus = (status: string) => {
@@ -197,58 +278,28 @@ export default function OrdersDashboard() {
     setSelectedStatuses(new Set(select ? Object.keys(statusLabels) : []));
   };
 
-  // Check for global admin access
+  // Update filter effect
   useEffect(() => {
-    if (!loading && user) {
-      const isGlobalAdmin = user.roles?.includes('admin');
-      if (!isGlobalAdmin) {
-        router.push('/');
-        toast.error("You don't have permission to access this page");
-      }
+    let result = [...orders];
+    
+    // Apply status filter
+    if (selectedStatuses.size < Object.keys(statusLabels).length) {
+      result = result.filter(order => selectedStatuses.has(order.status));
     }
-  }, [loading, user, router]);
-
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        // Only fetch if user is a global admin
-        if (!user?.roles?.includes('admin')) {
-          return;
-        }
-
-        const orders = await ordersApi.getAdminOrders(user.token);
-        setOrders(orders);
-      } catch (error) {
-        console.error('Error fetching orders:', error);
-        setError(error instanceof Error ? error.message : 'Failed to fetch orders');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user?.token) {
-      fetchOrders();
-    }
-  }, [user]);
-
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    if (!user?.token) return;
-
-    try {
-      const updatedOrder = await ordersApi.updateOrderStatus(user.token, orderId, newStatus);
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId ? updatedOrder : order
-        )
+    
+    // Apply search filter (on order ID or customer name)
+    if (searchTerm) {
+      const lowercaseSearch = searchTerm.toLowerCase();
+      result = result.filter(order => 
+        order.id.toLowerCase().includes(lowercaseSearch) ||
+        order.delivery_address?.customer_name?.toLowerCase().includes(lowercaseSearch) || false
       );
-      toast.success('Order status updated successfully');
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error('Failed to update order status');
     }
-  };
+    
+    setFilteredOrders(result);
+  }, [orders, selectedStatuses, searchTerm]);
 
-  if (loading) {
+  if (rolesLoading || loading) {
     return (
       <main className="min-h-screen bg-[#F5F2EB] pt-24">
         <div className="container mx-auto px-4">
@@ -285,10 +336,24 @@ export default function OrdersDashboard() {
         <div className="mb-12">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div>
-              <h1 className="text-4xl font-bold text-[#2D3748] mb-2">Localmart Dashboard</h1>
+              {store && (
+                <Link href={`/store/${storeId}`}>
+                  <h1 className="text-4xl font-bold text-[#2D3748] mb-2 hover:text-[#2A9D8F] transition-colors">{store.name}</h1>
+                </Link>
+              )}
+              <div className="flex items-center gap-4">
+                <p className="text-lg text-[#4A5568]">Vendor Dashboard</p>
+                <Link
+                  href={`/store/${storeId}/inventory`}
+                  className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm flex items-center gap-1"
+                >
+                  <span>Manage Inventory</span>
+                  <ChartBarIcon className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
 
-            {/* Metrics Grid */}
+            {/* Key Metrics Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Pending Orders */}
               <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
@@ -337,10 +402,32 @@ export default function OrdersDashboard() {
           </div>
         </div>
 
-        {/* Orders Chart */}
-        <div className="mb-12">
+        {/* New Insights Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+          {/* Popular Items */}
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders by Store (Last 30 Days)</h2>
+            <h2 className="text-xl font-bold text-[#2D3748] mb-4">Top Selling Items</h2>
+            <div className="divide-y divide-[#2A9D8F]/10">
+              {metrics.popularItems.map((item, index) => (
+                <div key={item.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-bold text-[#2A9D8F]">#{index + 1}</span>
+                      <div>
+                        <p className="font-medium text-[#2D3748]">{item.name}</p>
+                        <p className="text-sm text-[#4A5568]">{item.count} units sold</p>
+                      </div>
+                    </div>
+                    <p className="font-medium text-[#2D3748]">${item.revenue.toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Daily Orders Chart */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-[#2D3748] mb-6">Daily Orders (Last 30 Days)</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
@@ -368,14 +455,13 @@ export default function OrdersDashboard() {
                     cursor={{ fill: 'rgba(42, 157, 143, 0.1)' }}
                   />
                   <Legend />
-                  {calculateDailyOrderCounts(orders).stores.map((store, index) => (
+                  {calculateDailyOrderCounts(orders).items.map((itemName, index) => (
                     <Bar 
-                      key={store.id}
-                      dataKey={store.id}
-                      name={store.name}
-                      stackId="stores"
+                      key={itemName}
+                      dataKey={itemName}
+                      name={itemName}
+                      stackId="items"
                       fill={getStoreColor(index)}
-                      radius={[index === 0 ? 4 : 0, index === 0 ? 4 : 0, 0, 0]}
                     />
                   ))}
                 </BarChart>
@@ -383,6 +469,9 @@ export default function OrdersDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Orders Table Title */}
+        <h2 className="text-2xl font-bold text-[#2D3748] mb-6">All Orders</h2>
 
         {/* Filters Section */}
         <div className="mb-8">
@@ -455,7 +544,7 @@ export default function OrdersDashboard() {
           {searchTerm && ` matching "${searchTerm}"`}
         </div>
 
-        {/* Orders Table */}
+        {/* Table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-[#2A9D8F]/10">
             <thead className="bg-[#2A9D8F]/5">
@@ -490,88 +579,66 @@ export default function OrdersDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2A9D8F]/10">
-              {filteredOrders.map((order) => {
-                // Get the first store's index for coloring
-                const storeIndex = calculateDailyOrderCounts(orders).stores
-                  .findIndex(s => s.id === order.stores[0]?.store.id);
-
-                return (
-                  <tr 
-                    key={order.id}
-                    style={{ backgroundColor: getStoreColor(storeIndex, 0.15) }}
-                    className="transition-colors hover:bg-white/60"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                      #{order.id.slice(-6)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                      {formatDateTime(order.created)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                      {order.delivery_address?.customer_name || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
-                      {order.delivery_address?.customer_phone || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-[#4A5568]">
-                      {order.delivery_address ? (
-                        <>
-                          <div>
-                            {order.delivery_address.street_address.filter(Boolean).join(', ')}
-                          </div>
-                          <div>
-                            {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-gray-400 italic">No address available</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[order.status as keyof typeof statusColors]}`}>
-                          {statusLabels[order.status as keyof typeof statusLabels]}
-                        </span>
-                        <select
-                          value={order.status}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          className="text-sm border-[#2A9D8F]/20 rounded-md focus:ring-[#2A9D8F] focus:border-[#2A9D8F]"
-                        >
-                          {Object.entries(statusLabels).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
+              {filteredOrders.map((order) => (
+                <tr key={order.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                    #{order.id.slice(-6)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
+                    {formatDateTime(order.created)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                    {order.delivery_address?.customer_name || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
+                    {order.delivery_address?.customer_phone || '-'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[#4A5568]">
+                    {order.delivery_address ? (
+                      <>
+                        <div>
+                          {order.delivery_address.street_address.filter(Boolean).join(', ')}
+                        </div>
+                        <div>
+                          {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-gray-400 italic">No address available</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[order.status as keyof typeof statusColors]}`}>
+                      {statusLabels[order.status as keyof typeof statusLabels]}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentStatusColors[order.payment_status as keyof typeof paymentStatusColors]}`}>
+                      {paymentStatusLabels[order.payment_status as keyof typeof paymentStatusLabels]}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-[#4A5568]">
+                      {order.stores.map((store) => (
+                        <div key={store.store.id} className="mb-2 last:mb-0">
+                          {store.items.map((item) => (
+                            <div key={item.id} className="ml-4">
+                              {item.quantity}x {item.name} (${item.price.toFixed(2)})
+                            </div>
                           ))}
-                        </select>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentStatusColors[order.payment_status as keyof typeof paymentStatusColors]}`}>
-                        {paymentStatusLabels[order.payment_status as keyof typeof paymentStatusLabels]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-[#4A5568]">
-                        {order.stores.map((store) => (
-                          <div key={store.store.id} className="mb-2 last:mb-0">
-                            <div className="font-medium text-[#2D3748]">{store.store.name}</div>
-                            {store.items.map((item) => (
-                              <div key={item.id} className="ml-4">
-                                {item.quantity}x {item.name} (${item.price.toFixed(2)})
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
-                      ${order.total_amount.toFixed(2)}
-                    </td>
-                  </tr>
-                );
-              })}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
+                    ${order.total_amount.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
     </main>
   );
-}
+} 

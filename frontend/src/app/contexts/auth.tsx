@@ -1,14 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { config } from '@/config';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  token: string;
-}
+import { authApi, User } from '@/api';
 
 interface AuthContextType {
   user: User | null;
@@ -31,24 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${config.apiUrl}/api/v0/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Login failed');
-    }
-
-    const data = await response.json();
+    const data = await authApi.login(email, password);
     const userData = {
       id: data.user.id,
       email: data.user.email,
       name: `${data.user.first_name} ${data.user.last_name}`.trim(),
       token: data.token,
+      roles: data.user.roles || [],
     };
 
     setUser(userData);
@@ -58,32 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (email: string, password: string, name: string) => {
     // Split name into first and last name
     const [first_name, ...lastNameParts] = name.trim().split(' ');
-    const last_name = lastNameParts.join(' ') || ''; // Join remaining parts or empty string
+    const last_name = lastNameParts.join(' ') || '';
 
-    const response = await fetch(`${config.apiUrl}/api/v0/auth/signup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        passwordConfirm: password,
-        first_name,
-        last_name
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Signup failed');
-    }
-
-    const data = await response.json();
+    const data = await authApi.signup(email, password, first_name, last_name);
     const userData = {
       id: data.user.id,
       email: data.user.email,
       name: `${data.user.first_name} ${data.user.last_name}`.trim(),
       token: data.token,
+      roles: data.user.roles || [],
     };
 
     setUser(userData);
@@ -108,4 +73,9 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+export function useIsAdmin() {
+  const { user } = useAuth();
+  return user?.roles?.includes('admin') || false;
 } 
