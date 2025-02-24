@@ -10,6 +10,7 @@ clean:
 
 clean-data:
 	rm -rf ./volumes
+	rm -rf frontend/.next
 
 deploy-frontend:
 	cd frontend && fly deploy

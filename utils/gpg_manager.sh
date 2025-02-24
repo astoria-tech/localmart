@@ -49,10 +49,9 @@ import_keys() {
         fi
     done
 
-    # Store the key IDs in a more permanent location for later use
-    mkdir -p ~/.localmart
-    mv "$key_ids_file" ~/.localmart/github_key_ids
-    echo "Imported keys have been stored in ~/.localmart/github_key_ids"
+    # Store the key IDs in the repository
+    mv "$key_ids_file" .localmart-github-key-ids
+    echo "Imported keys have been stored in .localmart-github-key-ids"
 }
 
 # Function to encrypt a file
@@ -64,7 +63,7 @@ encrypt_file() {
     fi
 
     # Check if we have stored key IDs
-    if [ ! -f ~/.localmart/github_key_ids ]; then
+    if [ ! -f .localmart-github-key-ids ]; then
         echo "Error: No GitHub keys found. Please run import-keys first."
         exit 1
     fi
@@ -75,7 +74,7 @@ encrypt_file() {
         if [ -n "$key_id" ]; then
             recipient_args="$recipient_args -r $key_id"
         fi
-    done < ~/.localmart/github_key_ids
+    done < .localmart-github-key-ids
 
     if [ -z "$recipient_args" ]; then
         echo "Error: No valid recipient keys found"
