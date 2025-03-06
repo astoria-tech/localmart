@@ -7,7 +7,7 @@ import { MapPinIcon, BuildingStorefrontIcon, XMarkIcon, ClockIcon } from '@heroi
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
-import type { LatLngExpression, LatLngTuple } from 'leaflet';
+import type { LatLngTuple } from 'leaflet';
 import styles from './map.module.css';
 import { ordersApi, Order } from '@/api';
 
