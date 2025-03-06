@@ -7,11 +7,33 @@ import { MapPinIcon, BuildingStorefrontIcon, XMarkIcon, ClockIcon } from '@heroi
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
-import type { LatLngExpression, LatLngTuple } from 'leaflet';
+import type { LatLngTuple } from 'leaflet';
 import styles from './map.module.css';
-import ReactDOMServer from 'react-dom/server';
-import L from 'leaflet';
 import { ordersApi, Order } from '@/api';
+
+// We'll create a reference to store Leaflet when it's loaded
+let L: any;
+let ReactDOMServerModule: any;
+
+// Define interfaces for the store and delivery address
+interface StoreWithCoordinates {
+  id: string;
+  name: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface DeliveryAddress {
+  street_address: string[];
+  city: string;
+  state: string;
+  zip_code: string;
+  country?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  latitude?: number;
+  longitude?: number;
+}
 
 // Dynamically import the map components to avoid SSR issues
 const MapContainer = dynamic(
@@ -73,6 +95,11 @@ export default function OrderViewPage() {
 
   // Create a ref for the map instance
   const [mapReady, setMapReady] = useState(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const [coordinates, setCoordinates] = useState<{ store: LatLngTuple; delivery: LatLngTuple }>({
+    store: MOCK_COORDINATES.store,
+    delivery: MOCK_COORDINATES.delivery
+  });
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -87,8 +114,46 @@ export default function OrderViewPage() {
         }
 
         setOrder(order);
+
+        // Get store coordinates
+        if (order.stores && order.stores.length > 0) {
+          const store = order.stores[0].store as StoreWithCoordinates;
+          
+          // Get store coordinates directly from the order data
+          const storeLat = store.latitude;
+          const storeLng = store.longitude;
+          
+          // Get delivery coordinates from order
+          const deliveryAddress = order.delivery_address as DeliveryAddress | undefined;
+          const deliveryLat = deliveryAddress?.latitude;
+          const deliveryLng = deliveryAddress?.longitude;
+          
+          // Check if we have valid coordinates
+          const hasStoreCoords = storeLat !== undefined && storeLng !== undefined;
+          const hasDeliveryCoords = deliveryLat !== undefined && deliveryLng !== undefined;
+          
+          if (hasStoreCoords && hasDeliveryCoords) {
+            const storeCoords: LatLngTuple = [Number(storeLat), Number(storeLng)];
+            const deliveryCoords: LatLngTuple = [Number(deliveryLat), Number(deliveryLng)];
+            
+            // Validate that the coordinates are valid numbers
+            if (!isNaN(storeCoords[0]) && !isNaN(storeCoords[1]) && 
+                !isNaN(deliveryCoords[0]) && !isNaN(deliveryCoords[1])) {
+              setCoordinates({
+                store: storeCoords,
+                delivery: deliveryCoords
+              });
+            } else {
+              setCoordinates(MOCK_COORDINATES);
+            }
+          } else {
+            setCoordinates(MOCK_COORDINATES);
+          }
+        } else {
+          setCoordinates(MOCK_COORDINATES);
+        }
       } catch (error) {
-        console.error('Error fetching order:', error);
+        // Error handling
       } finally {
         setLoading(false);
       }
@@ -98,6 +163,19 @@ export default function OrderViewPage() {
       fetchOrder();
     }
   }, [user, orderId]);
+
+  // Load Leaflet dynamically on the client side
+  useEffect(() => {
+    // Dynamic import of Leaflet and ReactDOMServer
+    Promise.all([
+      import('leaflet'),
+      import('react-dom/server')
+    ]).then(([leaflet, reactDOMServer]) => {
+      L = leaflet.default;
+      ReactDOMServerModule = reactDOMServer.default;
+      setLeafletLoaded(true);
+    });
+  }, []);
 
   useEffect(() => {
     // This effect ensures Leaflet is only loaded client-side
@@ -179,11 +257,11 @@ export default function OrderViewPage() {
     <div className="min-h-screen bg-[#F5F2EB] pt-16 relative">
       {/* Map Background */}
       <div className="absolute inset-0 pt-16">
-        {mapReady && (
+        {mapReady && leafletLoaded && (
           <MapContainer
             center={[
-              (MOCK_COORDINATES.store[0] + MOCK_COORDINATES.delivery[0]) / 2,
-              (MOCK_COORDINATES.store[1] + MOCK_COORDINATES.delivery[1]) / 2 - 0.007
+              (coordinates.store[0] + coordinates.delivery[0]) / 2,
+              (coordinates.store[1] + coordinates.delivery[1]) / 2 - 0.007
             ]}
             zoom={15}
             style={{ height: '100%', width: '100%' }}
@@ -195,10 +273,10 @@ export default function OrderViewPage() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attribution">CARTO</a>'
             />
             <Marker 
-              position={MOCK_COORDINATES.store}
+              position={coordinates.store}
               icon={L.divIcon({
                 className: 'custom-marker',
-                html: ReactDOMServer.renderToString(<StoreMarker />)
+                html: ReactDOMServerModule.renderToString(<StoreMarker />)
               })}
             >
               <Popup>
@@ -207,10 +285,10 @@ export default function OrderViewPage() {
               </Popup>
             </Marker>
             <Marker 
-              position={MOCK_COORDINATES.delivery}
+              position={coordinates.delivery}
               icon={L.divIcon({
                 className: 'custom-marker',
-                html: ReactDOMServer.renderToString(<DeliveryMarker />)
+                html: ReactDOMServerModule.renderToString(<DeliveryMarker />)
               })}
             >
               <Popup>
@@ -224,8 +302,8 @@ export default function OrderViewPage() {
             </Marker>
             <Polyline
               positions={[
-                MOCK_COORDINATES.store,
-                MOCK_COORDINATES.delivery
+                coordinates.store,
+                coordinates.delivery
               ]}
               color="#2A9D8F"
               weight={3}

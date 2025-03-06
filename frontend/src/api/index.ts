@@ -29,6 +29,8 @@ export interface Profile {
   city: string;
   state: string;
   zip: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Order {
@@ -53,6 +55,8 @@ export interface Order {
     store: {
       id: string;
       name: string;
+      latitude?: number;
+      longitude?: number;
     };
     items: {
       id: string;
@@ -75,6 +79,8 @@ export interface Store {
   facebook?: string;
   twitter?: string;
   items?: StoreItem[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface StoreItem {
@@ -254,6 +260,14 @@ export const storesApi = {
 
   getStoreRoles: async (token: string, storeId: string): Promise<{ roles: string[] }> => {
     const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/roles`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
+  geocodeStoreAddress: async (token: string, storeId: string): Promise<Store> => {
+    const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}/geocode`, {
+      method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return handleResponse(response);
