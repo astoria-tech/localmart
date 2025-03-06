@@ -1,0 +1,10 @@
+the project is a monorepo with a nextjs frontend in frontend/, a fastapi python backend in python-backend/, and all workflow commands are in the Makefile, we use those to control docker compose
+
+when updates are requested, remember to consider if both the frontend and backend need changes
+
+all the db migrations are in pb_migrations/ directory. when we ask to generate new migrations, take a look
+at the existing migrations to see how to write the new one. use the current timestamp as part of the filename.
+
+keep an eye out for security issues esp. in the API layer (like if we should be sending the data from the frontend or
+if the backend should be pulling the data from the db (like when submitting an order, the prices should not be sent
+from the frontend, they should be pulled from the db)
