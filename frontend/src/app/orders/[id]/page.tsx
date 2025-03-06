@@ -9,9 +9,11 @@ import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 import type { LatLngExpression, LatLngTuple } from 'leaflet';
 import styles from './map.module.css';
-import ReactDOMServer from 'react-dom/server';
-import L from 'leaflet';
 import { ordersApi, Order } from '@/api';
+
+// We'll create a reference to store Leaflet when it's loaded
+let L: any;
+let ReactDOMServerModule: any;
 
 // Dynamically import the map components to avoid SSR issues
 const MapContainer = dynamic(
@@ -73,6 +75,7 @@ export default function OrderViewPage() {
 
   // Create a ref for the map instance
   const [mapReady, setMapReady] = useState(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -98,6 +101,19 @@ export default function OrderViewPage() {
       fetchOrder();
     }
   }, [user, orderId]);
+
+  // Load Leaflet dynamically on the client side
+  useEffect(() => {
+    // Dynamic import of Leaflet and ReactDOMServer
+    Promise.all([
+      import('leaflet'),
+      import('react-dom/server')
+    ]).then(([leaflet, reactDOMServer]) => {
+      L = leaflet.default;
+      ReactDOMServerModule = reactDOMServer.default;
+      setLeafletLoaded(true);
+    });
+  }, []);
 
   useEffect(() => {
     // This effect ensures Leaflet is only loaded client-side
@@ -179,7 +195,7 @@ export default function OrderViewPage() {
     <div className="min-h-screen bg-[#F5F2EB] pt-16 relative">
       {/* Map Background */}
       <div className="absolute inset-0 pt-16">
-        {mapReady && (
+        {mapReady && leafletLoaded && (
           <MapContainer
             center={[
               (MOCK_COORDINATES.store[0] + MOCK_COORDINATES.delivery[0]) / 2,
@@ -198,7 +214,7 @@ export default function OrderViewPage() {
               position={MOCK_COORDINATES.store}
               icon={L.divIcon({
                 className: 'custom-marker',
-                html: ReactDOMServer.renderToString(<StoreMarker />)
+                html: ReactDOMServerModule.renderToString(<StoreMarker />)
               })}
             >
               <Popup>
@@ -210,7 +226,7 @@ export default function OrderViewPage() {
               position={MOCK_COORDINATES.delivery}
               icon={L.divIcon({
                 className: 'custom-marker',
-                html: ReactDOMServer.renderToString(<DeliveryMarker />)
+                html: ReactDOMServerModule.renderToString(<DeliveryMarker />)
               })}
             >
               <Popup>
