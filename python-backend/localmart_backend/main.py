@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import datetime
 import json
@@ -7,15 +6,14 @@ import os
 from typing import List, Dict, Set, Optional
 from contextlib import contextmanager
 
-from fastapi import FastAPI, HTTPException, Response, BackgroundTasks, Request, Header, Depends
+from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import stripe
-from pocketbase import Client
 
-from .uber_direct import UberDirectClient
 from .pocketbase_service import PocketBaseService
 from .config import Config
+from .geocoding_service import GeocodingService
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -31,9 +29,6 @@ UBER_CUSTOMER_ID = Config.UBER_CUSTOMER_ID
 UBER_CLIENT_ID = Config.UBER_CLIENT_ID
 UBER_CLIENT_SECRET = Config.UBER_CLIENT_SECRET
 
-# Initialize Uber Direct client
-uber_client = UberDirectClient(UBER_CUSTOMER_ID, UBER_CLIENT_ID, UBER_CLIENT_SECRET)
-
 # Track active deliveries
 active_deliveries: Set[str] = set()
 
@@ -42,6 +37,9 @@ stripe.api_key = Config.STRIPE_SECRET_KEY
 
 # Initialize Stripe webhook secret
 STRIPE_WEBHOOK_SECRET = Config.STRIPE_WEBHOOK_SECRET
+
+# Initialize geocoding service
+geocoding_service = GeocodingService()  # Will get API key from environment variable
 
 @contextmanager
 def user_auth_context(token: Optional[str]):
@@ -291,7 +289,9 @@ async def create_order(request: Dict):
                 'delivery_address': {
                     **request['delivery_address'],
                     'customer_name': f"{user.first_name} {user.last_name}".strip(),
-                    'customer_phone': getattr(user, 'phone_number', None)
+                    'customer_phone': getattr(user, 'phone_number', None),
+                    'latitude': request['delivery_address'].get('latitude', getattr(user, 'latitude', None)),
+                    'longitude': request['delivery_address'].get('longitude', getattr(user, 'longitude', None))
                 },
                 'customer_notes': request.get('customer_notes', ''),
             })
@@ -368,7 +368,9 @@ async def get_all_orders(request: Request):
                     stores_dict[store_id] = {
                         'store': {
                             'id': store.id,
-                            'name': store.name
+                            'name': store.name,
+                            'latitude': getattr(store, 'latitude', None),
+                            'longitude': getattr(store, 'longitude', None)
                         },
                         'items': []
                     }
@@ -439,7 +441,9 @@ async def get_user_orders(request: Request):
                     stores_dict[store_id] = {
                         'store': {
                             'id': store.id,
-                            'name': store.name
+                            'name': store.name,
+                            'latitude': getattr(store, 'latitude', None),
+                            'longitude': getattr(store, 'longitude', None)
                         },
                         'items': []
                     }
@@ -602,7 +606,9 @@ async def get_profile(request: Request):
                 'street_2': getattr(user, 'street_2', ''),
                 'city': getattr(user, 'city', ''),
                 'state': getattr(user, 'state', ''),
-                'zip': getattr(user, 'zip', '')
+                'zip': getattr(user, 'zip', ''),
+                'latitude': getattr(user, 'latitude', None),
+                'longitude': getattr(user, 'longitude', None)
             }
         except Exception as e:
             logger.error(f"Error fetching user profile: {str(e)}")
@@ -625,7 +631,15 @@ async def update_profile(request: Request):
 
     with user_auth_context(token):
         try:
-            user = pb_service.update('users', user_id, {
+            # Check if we need to geocode the address
+            should_geocode = all([
+                body.get('street_1'),
+                body.get('city'),
+                body.get('state'),
+                body.get('zip')
+            ])
+            
+            update_data = {
                 'first_name': body.get('first_name'),
                 'last_name': body.get('last_name'),
                 'phone_number': body.get('phone_number'),
@@ -634,7 +648,28 @@ async def update_profile(request: Request):
                 'city': body.get('city'),
                 'state': body.get('state'),
                 'zip': body.get('zip')
-            })
+            }
+            
+            # Geocode the address if all required fields are present
+            if should_geocode:
+                try:
+                    coordinates = geocoding_service.geocode_address(
+                        street=body.get('street_1'),
+                        city=body.get('city'),
+                        state=body.get('state'),
+                        zip_code=body.get('zip')
+                    )
+                    
+                    if coordinates:
+                        lat, lon = coordinates
+                        update_data['latitude'] = lat
+                        update_data['longitude'] = lon
+                        logger.info(f"Geocoded address for user {user_id}: ({lat}, {lon})")
+                except Exception as e:
+                    logger.error(f"Error geocoding address for user {user_id}: {str(e)}")
+                    # Continue with the update even if geocoding fails
+            
+            user = pb_service.update('users', user_id, update_data)
             
             return {
                 'first_name': getattr(user, 'first_name', ''),
@@ -645,7 +680,9 @@ async def update_profile(request: Request):
                 'street_2': getattr(user, 'street_2', ''),
                 'city': getattr(user, 'city', ''),
                 'state': getattr(user, 'state', ''),
-                'zip': getattr(user, 'zip', '')
+                'zip': getattr(user, 'zip', ''),
+                'latitude': getattr(user, 'latitude', None),
+                'longitude': getattr(user, 'longitude', None)
             }
         except Exception as e:
             logger.error(f"Error updating user profile: {str(e)}")
@@ -658,6 +695,7 @@ async def update_profile(request: Request):
 
 def serialize_store(store) -> Dict:
     """Extract store fields from a store record"""
+    # Note: PocketBase field is 'zip' but we send as 'zip_code' to the frontend
     return {
         "id": store.id,
         "name": store.name,
@@ -665,7 +703,9 @@ def serialize_store(store) -> Dict:
         "street_2": store.street_2,
         "city": store.city,
         "state": store.state,
-        "zip_code": store.zip  # PocketBase field is 'zip' but we send as 'zip_code'
+        "zip_code": store.zip,  # PocketBase field is 'zip' but we send as 'zip_code'
+        "latitude": getattr(store, 'latitude', None),
+        "longitude": getattr(store, 'longitude', None)
     }
 
 def serialize_store_item(item) -> Dict:
@@ -1006,7 +1046,9 @@ async def get_store_orders(store_id: str, request: Request):
                         stores_dict[store_id_key] = {
                             'store': {
                                 'id': store.id,
-                                'name': store.name
+                                'name': store.name,
+                                'latitude': getattr(store, 'latitude', None),
+                                'longitude': getattr(store, 'longitude', None)
                             },
                             'items': []
                         }
@@ -1126,3 +1168,74 @@ async def delete_store_item(store_id: str, item_id: str, request: Request):
             return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v0/stores/{store_id}/geocode", response_model=Dict)
+async def geocode_store_address(store_id: str, request: Request):
+    """Geocode a store's address and update the store record"""
+    token = get_token_from_request(request)
+    
+    with user_auth_context(token) as user:
+        # Check if user has admin role for the store or is a global admin
+        if not 'admin' in user.roles:
+            store_roles = pb_service.pb.collection('store_roles').get_list(
+                1, 1, 
+                query_params={
+                    "filter": f'user="{user.id}" && store="{store_id}" && role="admin"'
+                }
+            )
+            if not store_roles.items:
+                raise HTTPException(status_code=403, detail="Not authorized to manage this store")
+        
+        try:
+            # Get the store
+            store = pb_service.get_one('stores', store_id)
+            
+            # Check if we have all the required address fields
+            if not all([
+                getattr(store, 'street_1', None),
+                getattr(store, 'city', None),
+                getattr(store, 'state', None),
+                getattr(store, 'zip', None)  # PocketBase field is 'zip'
+            ]):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Store address is incomplete. Please update the store address first."
+                )
+            
+            # Geocode the address
+            coordinates = geocoding_service.geocode_address(
+                street=getattr(store, 'street_1', ''),
+                city=getattr(store, 'city', ''),
+                state=getattr(store, 'state', ''),
+                zip_code=getattr(store, 'zip', '')
+            )
+            
+            if not coordinates:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not geocode the store address. Please check the address and try again."
+                )
+            
+            # Update the store with the coordinates
+            lat, lon = coordinates
+            updated_store = pb_service.update('stores', store_id, {
+                'latitude': lat,
+                'longitude': lon
+            })
+            
+            return {
+                'id': updated_store.id,
+                'name': updated_store.name,
+                'latitude': getattr(updated_store, 'latitude', None),
+                'longitude': getattr(updated_store, 'longitude', None),
+                'message': 'Store coordinates updated successfully'
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error geocoding store address: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to geocode store address: {str(e)}"
+            )

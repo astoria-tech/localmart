@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import { config } from '@/config';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
-import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
 import { storesApi, ordersApi, Order } from '@/api';
@@ -213,10 +213,11 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [store, setStore] = useState<{ name: string } | null>(null);
+  const [store, setStore] = useState<{ name: string, latitude?: number, longitude?: number } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(Object.keys(statusLabels)));
   const [searchTerm, setSearchTerm] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
   const router = useRouter();
 
   const metrics = calculateMetrics(orders);
@@ -299,6 +300,26 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
     setFilteredOrders(result);
   }, [orders, selectedStatuses, searchTerm]);
 
+  const handleGeocodeAddress = async () => {
+    if (!user?.token) return;
+    
+    setGeocoding(true);
+    try {
+      const updatedStore = await storesApi.geocodeStoreAddress(user.token, storeId);
+      setStore(prev => ({
+        ...prev!,
+        latitude: updatedStore.latitude,
+        longitude: updatedStore.longitude
+      }));
+      toast.success('Store address geocoded successfully');
+    } catch (error) {
+      console.error('Error geocoding store address:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to geocode store address');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   if (rolesLoading || loading) {
     return (
       <main className="min-h-screen bg-[#F5F2EB] pt-24">
@@ -350,7 +371,20 @@ export default function StoreDashboard({ params }: { params: Promise<{ id: strin
                   <span>Manage Inventory</span>
                   <ChartBarIcon className="w-4 h-4" />
                 </Link>
+                <button
+                  onClick={handleGeocodeAddress}
+                  disabled={geocoding}
+                  className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>{geocoding ? 'Geocoding...' : 'Update Store Coordinates'}</span>
+                  <MapPinIcon className="w-4 h-4" />
+                </button>
               </div>
+              {store?.latitude && store?.longitude && (
+                <p className="text-sm text-[#4A5568] mt-1">
+                  Store coordinates: {Number(store.latitude).toFixed(6)}, {Number(store.longitude).toFixed(6)}
+                </p>
+              )}
             </div>
 
             {/* Key Metrics Grid */}

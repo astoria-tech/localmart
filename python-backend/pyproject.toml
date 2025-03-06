@@ -12,6 +12,7 @@ uvicorn = {extras = ["standard"], version = "^0.34.0"}
 pocketbase = "^0.14.0"
 ipdb = "^0.13.13"
 stripe = "^11.5.0"
+requests = "^2.31.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"

@@ -349,6 +349,24 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Display coordinates if available */}
+            {profile.latitude && profile.longitude && (
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-semibold text-[#2D3748] mb-6 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#2A9D8F]" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  Location Coordinates
+                </h2>
+                <p className="text-sm text-[#4A5568]">
+                  Your address has been geocoded to the following coordinates:
+                </p>
+                <p className="text-sm font-medium text-[#2D3748] mt-2">
+                  Latitude: {Number(profile.latitude).toFixed(6)}, Longitude: {Number(profile.longitude).toFixed(6)}
+                </p>
+              </div>
+            )}
+
             <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm p-6">
               <button
                 type="submit"

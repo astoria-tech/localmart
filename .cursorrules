@@ -8,3 +8,69 @@ at the existing migrations to see how to write the new one. use the current time
 keep an eye out for security issues esp. in the API layer (like if we should be sending the data from the frontend or
 if the backend should be pulling the data from the db (like when submitting an order, the prices should not be sent
 from the frontend, they should be pulled from the db)
+
+---
+
+## LocalMart System Architecture
+
+### Project Structure
+- **Monorepo architecture** with distinct frontend and backend components
+- **Docker Compose** orchestrates all services
+- **Makefile** provides workflow commands for development and deployment
+
+### Frontend (NextJS)
+- Located in `/frontend` directory
+- Built with **Next.js** and **TypeScript**
+- Uses **Tailwind CSS** for styling
+- Key directories:
+  - `/src/app`: Page components following Next.js App Router pattern
+  - `/src/components`: Reusable UI components
+  - `/src/api`: API client functions for backend communication
+  - `/src/contexts`: React context providers (auth, cart, etc.)
+  - `/src/utils`: Utility functions
+  - `/src/pocketbase`: PocketBase client configuration
+
+### Backend (FastAPI)
+- Located in `/python-backend` directory
+- Built with **FastAPI** and **Python**
+- Uses **Poetry** for dependency management
+- Key files:
+  - `localmart_backend/main.py`: Main API endpoints and application logic
+  - `localmart_backend/pocketbase_service.py`: Service for interacting with PocketBase
+  - `localmart_backend/config.py`: Configuration and environment variables
+  - `localmart_backend/geocoding_service.py`: Service for geocoding addresses
+  - `localmart_backend/uber_direct.py`: Integration with Uber Direct delivery service
+
+### Database (PocketBase)
+- Located in `/db` directory
+- Uses **PocketBase** as the database and authentication provider
+- Database migrations in `/db/pb_migrations/`
+- Data stored in `/volumes/pocketbase_data/`
+
+### Search (MeiliSearch)
+- MeiliSearch for product search functionality
+- Separate service for search indexing
+
+### API Structure
+- RESTful API with `/api/v0/` prefix
+- Key endpoints:
+  - `/api/v0/stores`: Store management
+  - `/api/v0/auth`: Authentication and user profile
+  - `/api/v0/orders`: Order management
+  - `/api/v0/payment`: Payment processing with Stripe
+
+### Authentication
+- JWT-based authentication via PocketBase
+- User roles for access control (admin, store admin)
+
+### External Integrations
+- **Stripe**: Payment processing
+- **Google Maps API**: Geocoding for addresses
+- **Uber Direct**: Delivery service integration
+
+### Data Models
+- **Users**: Customer profiles with addresses and payment methods
+- **Stores**: Merchant profiles with inventory
+- **Store Items**: Products available for purchase
+- **Orders**: Customer orders with items and delivery information
+- **Payment Methods**: Saved payment methods for users
