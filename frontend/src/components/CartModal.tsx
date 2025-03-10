@@ -6,7 +6,6 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCart } from '@/app/contexts/cart';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
-import { config } from '@/config';
 import { useRouter } from 'next/navigation';
 import { storesApi, paymentApi, authApi, ordersApi, SavedCard, Store } from '@/api';
 
@@ -139,7 +138,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       }
 
       // Create the order
-      await ordersApi.createOrder(user.token, {
+      const order = await ordersApi.createOrder(user.token, {
         token: user.token,
         user_id: user.id,
         store_id: store.id,
@@ -165,7 +164,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
       toast.success('Order placed successfully!');
       clearCart();
       onClose();
-      router.push('/orders');
+      router.push(`/orders/${order.order_id}`);
     } catch (error) {
       console.error('Error creating order:', error);
       toast.error('Failed to place order');
