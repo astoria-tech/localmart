@@ -3,11 +3,12 @@ import base64
 import json
 from typing import Dict, List, Any, Optional
 from pocketbase import PocketBase
+from .config import Config
 
 logger = logging.getLogger(__name__)
 
 class PocketBaseService:
-    def __init__(self, url: str = 'http://pocketbase:8090'):
+    def __init__(self, url: str = Config.POCKETBASE_URL):
         self.url = url
         self.client = PocketBase(url)
         self.pb = self.client  # Alias for compatibility
@@ -164,4 +165,16 @@ class PocketBaseService:
         except Exception as e:
             logger.error(f"Error getting user from token: {str(e)}")
             self.clear_token()  # Only clear token on error
-            return None 
+            return None
+
+def create_client(token: Optional[str] = None):
+    _pb = PocketBaseService(Config.POCKETBASE_URL)
+    if token:
+        _pb.set_token(token)
+    return _pb
+
+def create_admin_client():
+    _pb = PocketBaseService(Config.POCKETBASE_URL)
+    _pb.client.admins.auth_with_password(Config.POCKETBASE_ADMIN_EMAIL, Config.POCKETBASE_ADMIN_PASSWORD)
+    print("Admin client created")
+    return _pb
