@@ -115,10 +115,16 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # Local development
-        "https://localmart-frontend.fly.dev",  # Staging
-        "https://localmart-frontend-prod.fly.dev",  # Production
-        "https://localmart.nyc"  # Production
+        # Local development
+        "http://localhost:3000",
+
+        # Staging
+        "https://localmart-frontend.fly.dev",
+        "https://demo.localmart.nyc",
+
+        # Production
+        "https://localmart-frontend-prod.fly.dev",
+        "https://localmart.nyc"
     ],
     allow_credentials=True,
     allow_methods=["*"],
