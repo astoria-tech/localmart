@@ -865,7 +865,7 @@ async def delete_payment_method(card_id: str, authorization: str = Header(None))
             raise HTTPException(status_code=401, detail="Invalid token")
 
         # Get the card from PocketBase
-        card = pb(token).pb.collection('payment_methods').get_one(card_id)
+        card = pb(token).get_one('payment_methods', card_id)
         if not card or card.user != user.id:
             raise HTTPException(status_code=404, detail="Card not found")
 
@@ -873,7 +873,7 @@ async def delete_payment_method(card_id: str, authorization: str = Header(None))
         stripe.PaymentMethod.detach(card.stripe_payment_method_id)
 
         # Delete the card from PocketBase
-        pb(token).pb.collection('payment_methods').delete(card_id)
+        pb(token).delete('payment_methods', card_id)
 
         return {"status": "success"}
 
@@ -1179,7 +1179,7 @@ async def delete_store_item(store_id: str, item_id: str, request: Request):
             raise HTTPException(status_code=404, detail="Item not found in store")
 
         # Delete the item
-        pb(token).collection('store_items').delete(item_id)
+        pb(token).delete('store_items', item_id)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

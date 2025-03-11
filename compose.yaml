@@ -3,6 +3,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # dockerfile: Dockerfile.prod
     ports:
       - "3000:3000"
     volumes:
