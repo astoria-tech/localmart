@@ -2,18 +2,16 @@ import base64
 import datetime
 import json
 import logging
-import os
 from typing import List, Dict, Set, Optional
-from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import stripe
 
-from .pocketbase_service import create_client as pb, create_admin_client as pb_admin, PocketBaseService
+from .pocketbase import create_client as pb, create_admin_client as pb_admin
 from .config import Config
-from .geocoding_service import GeocodingService
+from .geocoding import GeocodingService
 from .uber_direct import UberDirectClient
 
 # Initialize logging
@@ -41,24 +39,6 @@ STRIPE_WEBHOOK_SECRET = Config.STRIPE_WEBHOOK_SECRET
 
 # Initialize geocoding service
 geocoding_service = GeocodingService()  # Will get API key from environment variable
-
-@contextmanager
-def user_auth_context(token: Optional[str]):
-    """Context manager to handle user authentication for PocketBase operations"""
-    if not token:
-        raise HTTPException(status_code=401, detail="No authorization token")
-    
-    try:
-        # Verify the user's token
-        token = token.split(' ')[1] if token.startswith('Bearer ') else token
-        user = pb.get_user_from_token(token)
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        yield user
-    except Exception as e:
-        logger.error(f"Auth error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
 
 def get_token_from_request(request: Request) -> str:
     """Extract and validate the auth token from a request"""
@@ -593,7 +573,7 @@ async def login(user: UserLogin):
             detail="Invalid email or password"
         )
 
-@app.get("/api/v0/auth/profile", response_model=Dict)
+@app.get("/api/v0/user/profile", response_model=Dict)
 async def get_profile(request: Request):
     """Get the current user's profile"""
     token = get_token_from_request(request)
@@ -622,7 +602,7 @@ async def get_profile(request: Request):
             detail=f"Failed to fetch user profile: {str(e)}"
         )
 
-@app.patch("/api/v0/auth/profile", response_model=Dict)
+@app.patch("/api/v0/user/profile", response_model=Dict)
 async def update_profile(request: Request):
     """Update the current user's profile"""
     token = get_token_from_request(request)

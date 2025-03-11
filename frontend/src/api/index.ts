@@ -160,14 +160,14 @@ export const authApi = {
   },
 
   getProfile: async (token: string): Promise<Profile> => {
-    const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
+    const response = await fetch(`${config.apiUrl}/api/v0/user/profile`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return handleResponse(response);
   },
 
   updateProfile: async (token: string, profile: Partial<Profile>): Promise<Profile> => {
-    const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
+    const response = await fetch(`${config.apiUrl}/api/v0/user/profile`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
