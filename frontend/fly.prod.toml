@@ -2,7 +2,12 @@ app = "localmart-frontend-prod"
 primary_region = "ewr" # Change this to your preferred region
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "Dockerfile.prod"
+  [build.args]
+    NEXT_PUBLIC_API_URL = "https://localmart-backend-prod.fly.dev"
+    NEXT_PUBLIC_POCKETBASE_URL = "https://localmart-pocketbase-prod.fly.dev"
+    NEXT_PUBLIC_SEARCH_URL = "https://localmart-search-prod.fly.dev"
+    NEXT_PUBLIC_MEILI_URL = "https://localmart-meilisearch-prod.fly.dev"
 
 [env]
   NODE_ENV = "production"

@@ -3,7 +3,6 @@ primary_region = "ewr" # Change this to your preferred region
 
 [build]
   dockerfile = "Dockerfile.prod"
-  # dockerfile = "Dockerfile"
   [build.args]
     NEXT_PUBLIC_API_URL = "https://localmart-backend.fly.dev"
     NEXT_PUBLIC_POCKETBASE_URL = "https://localmart-pocketbase.fly.dev"
