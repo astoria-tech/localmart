@@ -153,7 +153,7 @@ export default function OrderHistoryModal({ isOpen, onClose, orders }: OrderHist
                   as="h3"
                   className="text-2xl font-bold text-[#2D3748] mb-6"
                 >
-                  Order History
+                  Your Orders
                 </Dialog.Title>
 
                 {loading ? (

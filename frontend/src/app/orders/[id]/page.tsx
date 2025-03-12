@@ -106,8 +106,8 @@ export default function OrderViewPage() {
       if (!user?.token || !orderId) return;
 
       try {
-        const orders = await ordersApi.getAdminOrders(user.token);
-        const order = orders.find(o => o.id === orderId);
+        const orders = await ordersApi.getUserOrders(user.token);
+        const order = orders.find((o: Order) => o.id === orderId);
         
         if (!order) {
           throw new Error('Order not found');
