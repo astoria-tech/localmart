@@ -73,6 +73,7 @@ async def get_delivery_quote(request: DeliveryQuoteRequest):
         }
 
     except Exception as e:
+        logger.error(f"Delivery quote error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get delivery quote: {str(e)}"
@@ -159,11 +160,11 @@ async def create_order(request: Dict, req: Request):
             detail=f"Failed to create order: {str(e)}"
         )
 
+
 @router.get("/api/v0/orders", response_model=List[Dict])
 async def get_all_orders(request: Request):
     """Get all orders (admin only)"""
     token = get_token_from_request(request)
-    decoded_token = decode_jwt(token)
 
     # Verify user is admin
     user = pb(token).get_user_from_token(token)
@@ -334,13 +335,66 @@ async def update_order_status(order_id: str, request: Request):
             'updated': datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         
-        order = pb(token).update('orders', order_id, data)
+        # Update the order
+        pb(token).update('orders', order_id, data)
         
-        return {
-            'order_id': order.id,
-            'status': status,
-            'message': 'Order status updated successfully'
+        # Get the updated order with expanded items
+        updated_order = pb(token).get_one(
+            'orders',
+            order_id,
+            query_params={
+                "expand": "order_items_via_order.store_item,order_items_via_order.store_item.store"
+            }
+        )
+
+        # Format the order for response (same as in get_all_orders)
+        stores_dict = {}
+        order_items = updated_order.expand.get('order_items_via_order', [])
+
+        for item in order_items:
+            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
+                continue
+
+            store_item = item.expand['store_item']
+            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
+                continue
+
+            store = store_item.expand['store']
+            store_id = store.id
+
+            if store_id not in stores_dict:
+                stores_dict[store_id] = {
+                    'store': {
+                        'id': store.id,
+                        'name': store.name,
+                        'latitude': getattr(store, 'latitude', None),
+                        'longitude': getattr(store, 'longitude', None)
+                    },
+                    'items': []
+                }
+
+            stores_dict[store_id]['items'].append({
+                'id': item.id,
+                'name': store_item.name,
+                'quantity': item.quantity,
+                'price': item.price_at_time
+            })
+
+        delivery_address = updated_order.delivery_address if hasattr(updated_order, 'delivery_address') else None
+
+        formatted_order = {
+            'id': updated_order.id,
+            'created': updated_order.created,
+            'status': updated_order.status,
+            'payment_status': updated_order.payment_status,
+            'delivery_fee': updated_order.delivery_fee,
+            'total_amount': updated_order.total_amount,
+            'tax_amount': updated_order.tax_amount,
+            'delivery_address': delivery_address,
+            'stores': list(stores_dict.values())
         }
+
+        return formatted_order
     except Exception as e:
         logger.error(f"Error updating order status: {str(e)}")
         raise HTTPException(
