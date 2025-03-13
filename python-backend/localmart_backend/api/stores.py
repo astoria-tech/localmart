@@ -5,7 +5,8 @@ from typing import Dict, List
 
 from ..pocketbase import create_client as pb
 from ..api.models import StoreItem
-from ..api.utils import get_token_from_request, serialize_store, serialize_store_item, decode_jwt
+from ..api.utils import get_token_from_request, decode_jwt
+from ..api.serializers import serialize_store, serialize_store_item
 from ..geocoding import GeocodingService
 
 # Initialize geocoding service

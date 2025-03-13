@@ -1,7 +1,6 @@
 """Utility functions for the API routes."""
 
 from fastapi import HTTPException, Request
-from typing import Dict
 import base64
 import json
 
@@ -31,28 +30,3 @@ def decode_jwt(token):
         return json.loads(decoded)
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Failed to decode token: {str(e)}")
-
-def serialize_store(store) -> Dict:
-    """Serialize a store object to a dictionary."""
-    return {
-        "id": getattr(store, "id", ""),
-        "name": getattr(store, "name", ""),
-        "description": getattr(store, "description", ""),
-        "address": getattr(store, "address", {}),
-        "hours": getattr(store, "hours", {}),
-        "phone": getattr(store, "phone", ""),
-        "email": getattr(store, "email", ""),
-        "created": getattr(store, "created", ""),
-        "updated": getattr(store, "updated", "")
-    }
-
-def serialize_store_item(item) -> Dict:
-    """Serialize a store item object to a dictionary."""
-    return {
-        "id": getattr(item, "id", ""),
-        "name": getattr(item, "name", ""),
-        "price": getattr(item, "price", 0.0),
-        "description": getattr(item, "description", ""),
-        "created": getattr(item, "created", ""),
-        "updated": getattr(item, "updated", "")
-    } 

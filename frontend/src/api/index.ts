@@ -347,7 +347,7 @@ export const paymentApi = {
     return handleResponse(response);
   },
 
-  createSetupIntent: async (token: string): Promise<{ clientSecret: string }> => {
+  createSetupIntent: async (token: string): Promise<{ client_secret: string }> => {
     const response = await fetch(`${config.apiUrl}/api/v0/payment/setup-intent`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },

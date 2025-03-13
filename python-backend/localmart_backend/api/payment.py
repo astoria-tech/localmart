@@ -9,6 +9,7 @@ import logging
 from ..pocketbase import create_client as pb, create_admin_client as pb_admin
 from ..api.utils import get_token_from_request
 from ..config import Config
+from ..api.serializers import serialize_payment_method
 
 # Initialize logging
 logger = logging.getLogger(__name__)
@@ -140,7 +141,9 @@ async def get_payment_methods(request: Request):
             {"filter": f'user = "{user.id}"'}
         )
 
-        return cards.items
+        # Serialize the payment methods
+        serialized_cards = [serialize_payment_method(card) for card in cards.items]
+        return serialized_cards
 
     except Exception as e:
         print(f"Error fetching payment methods: {str(e)}")

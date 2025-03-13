@@ -8,6 +8,7 @@ from ..pocketbase import create_client as pb
 from ..api.models import UserLogin, UserSignup
 from ..api.utils import get_token_from_request, decode_jwt
 from ..geocoding import GeocodingService
+from ..api.serializers import serialize_auth_response, serialize_user_profile
 
 router = APIRouter(prefix="/api/v0/auth", tags=["auth"])
 geocoding_service = GeocodingService()
@@ -34,16 +35,7 @@ async def signup(user: UserSignup):
             user.password
         )
 
-        return {
-            "token": auth_data.token,
-            "user": {
-                "id": auth_data.record.id,
-                "email": auth_data.record.email,
-                "first_name": auth_data.record.first_name,
-                "last_name": auth_data.record.last_name,
-                "roles": getattr(auth_data.record, 'roles', []),
-            }
-        }
+        return serialize_auth_response(auth_data)
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -60,16 +52,7 @@ async def login(user: UserLogin):
             user.password
         )
 
-        return {
-            "token": auth_data.token,
-            "user": {
-                "id": auth_data.record.id,
-                "email": auth_data.record.email,
-                "first_name": auth_data.record.first_name,
-                "last_name": auth_data.record.last_name,
-                "roles": getattr(auth_data.record, 'roles', []),
-            }
-        }
+        return serialize_auth_response(auth_data)
     except Exception as e:
         raise HTTPException(
             status_code=401,
@@ -88,19 +71,7 @@ async def get_profile(request: Request):
 
     try:
         user = pb(token).get_one('users', user_id)
-        return {
-            'first_name': getattr(user, 'first_name', ''),
-            'last_name': getattr(user, 'last_name', ''),
-            'email': user.email,
-            'phone_number': getattr(user, 'phone_number', ''),
-            'street_1': getattr(user, 'street_1', ''),
-            'street_2': getattr(user, 'street_2', ''),
-            'city': getattr(user, 'city', ''),
-            'state': getattr(user, 'state', ''),
-            'zip': getattr(user, 'zip', ''),
-            'latitude': getattr(user, 'latitude', None),
-            'longitude': getattr(user, 'longitude', None)
-        }
+        return serialize_user_profile(user)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -150,31 +121,21 @@ async def update_profile(request: Request):
                 )
                 
                 if coordinates:
-                    lat, lon = coordinates
-                    update_data['latitude'] = lat
-                    update_data['longitude'] = lon
-                    logger.info(f"Geocoded address for user {user_id}: ({lat}, {lon})")
+                    update_data['latitude'] = coordinates['lat']
+                    update_data['longitude'] = coordinates['lng']
             except Exception as e:
-                logger.error(f"Error geocoding address for user {user_id}: {str(e)}")
-                # Continue with the update even if geocoding fails
+                logger.error(f"Geocoding error: {str(e)}")
+                # Continue without coordinates if geocoding fails
         
-        user = pb(token).update('users', user_id, update_data)
+        # Remove None values from update_data
+        update_data = {k: v for k, v in update_data.items() if v is not None}
         
-        return {
-            'first_name': getattr(user, 'first_name', ''),
-            'last_name': getattr(user, 'last_name', ''),
-            'email': user.email,
-            'phone_number': getattr(user, 'phone_number', ''),
-            'street_1': getattr(user, 'street_1', ''),
-            'street_2': getattr(user, 'street_2', ''),
-            'city': getattr(user, 'city', ''),
-            'state': getattr(user, 'state', ''),
-            'zip': getattr(user, 'zip', ''),
-            'latitude': getattr(user, 'latitude', None),
-            'longitude': getattr(user, 'longitude', None)
-        }
+        # Update the user record
+        updated_user = pb(token).update('users', user_id, update_data)
+
+        # Return the updated profile
+        return serialize_user_profile(updated_user)
     except Exception as e:
-        logger.error(f"Error updating user profile: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to update user profile: {str(e)}"

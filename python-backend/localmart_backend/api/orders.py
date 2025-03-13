@@ -11,6 +11,7 @@ from ..api.models import DeliveryQuoteRequest
 from ..uber_direct import UberDirectClient
 from ..config import Config
 from ..api.utils import get_token_from_request, decode_jwt
+from ..api.serializers import serialize_order
 
 # Initialize Uber Direct client
 UBER_CUSTOMER_ID = Config.UBER_CUSTOMER_ID
@@ -183,55 +184,7 @@ async def get_all_orders(request: Request):
     # Format orders for response
     formatted_orders = []
     for order in orders.items:
-        # Group items by store
-        stores_dict = {}
-
-        # Get all order items for this order
-        order_items = order.expand.get('order_items_via_order', [])
-
-        for item in order_items:
-            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
-                continue
-
-            store_item = item.expand['store_item']
-            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
-                continue
-
-            store = store_item.expand['store']
-            store_id = store.id
-
-            if store_id not in stores_dict:
-                stores_dict[store_id] = {
-                    'store': {
-                        'id': store.id,
-                        'name': store.name,
-                        'latitude': getattr(store, 'latitude', None),
-                        'longitude': getattr(store, 'longitude', None)
-                    },
-                    'items': []
-                }
-
-            stores_dict[store_id]['items'].append({
-                'id': item.id,
-                'name': store_item.name,
-                'quantity': item.quantity,
-                'price': item.price_at_time
-            })
-
-        delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
-
-        formatted_order = {
-            'id': order.id,
-            'created': order.created,
-            'status': order.status,
-            'payment_status': order.payment_status,
-            'delivery_fee': order.delivery_fee,
-            'total_amount': order.total_amount,
-            'tax_amount': order.tax_amount,
-            'delivery_address': delivery_address,
-            'stores': list(stores_dict.values())
-        }
-        formatted_orders.append(formatted_order)
+        formatted_orders.append(serialize_order(order))
 
     return formatted_orders
 
@@ -255,55 +208,7 @@ async def get_user_orders(request: Request):
     # Format orders for response
     formatted_orders = []
     for order in orders.items:
-        # Group items by store
-        stores_dict = {}
-
-        # Get all order items for this order
-        order_items = order.expand.get('order_items_via_order', [])
-
-        for item in order_items:
-            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
-                continue
-
-            store_item = item.expand['store_item']
-            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
-                continue
-
-            store = store_item.expand['store']
-            store_id = store.id
-
-            if store_id not in stores_dict:
-                stores_dict[store_id] = {
-                    'store': {
-                        'id': store.id,
-                        'name': store.name,
-                        'latitude': getattr(store, 'latitude', None),
-                        'longitude': getattr(store, 'longitude', None)
-                    },
-                    'items': []
-                }
-
-            stores_dict[store_id]['items'].append({
-                'id': item.id,
-                'name': store_item.name,
-                'quantity': item.quantity,
-                'price': item.price_at_time
-            })
-
-        delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
-
-        formatted_order = {
-            'id': order.id,
-            'created': order.created,
-            'status': order.status,
-            'payment_status': order.payment_status,
-            'delivery_fee': order.delivery_fee,
-            'total_amount': order.total_amount,
-            'tax_amount': order.tax_amount,
-            'delivery_address': delivery_address,
-            'stores': list(stores_dict.values())
-        }
-        formatted_orders.append(formatted_order)
+        formatted_orders.append(serialize_order(order))
 
     return formatted_orders
 
@@ -347,54 +252,8 @@ async def update_order_status(order_id: str, request: Request):
             }
         )
 
-        # Format the order for response (same as in get_all_orders)
-        stores_dict = {}
-        order_items = updated_order.expand.get('order_items_via_order', [])
-
-        for item in order_items:
-            if not hasattr(item, 'expand') or not item.expand.get('store_item'):
-                continue
-
-            store_item = item.expand['store_item']
-            if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
-                continue
-
-            store = store_item.expand['store']
-            store_id = store.id
-
-            if store_id not in stores_dict:
-                stores_dict[store_id] = {
-                    'store': {
-                        'id': store.id,
-                        'name': store.name,
-                        'latitude': getattr(store, 'latitude', None),
-                        'longitude': getattr(store, 'longitude', None)
-                    },
-                    'items': []
-                }
-
-            stores_dict[store_id]['items'].append({
-                'id': item.id,
-                'name': store_item.name,
-                'quantity': item.quantity,
-                'price': item.price_at_time
-            })
-
-        delivery_address = updated_order.delivery_address if hasattr(updated_order, 'delivery_address') else None
-
-        formatted_order = {
-            'id': updated_order.id,
-            'created': updated_order.created,
-            'status': updated_order.status,
-            'payment_status': updated_order.payment_status,
-            'delivery_fee': updated_order.delivery_fee,
-            'total_amount': updated_order.total_amount,
-            'tax_amount': updated_order.tax_amount,
-            'delivery_address': delivery_address,
-            'stores': list(stores_dict.values())
-        }
-
-        return formatted_order
+        # Format the order for response using the serializer
+        return serialize_order(updated_order)
     except Exception as e:
         logger.error(f"Error updating order status: {str(e)}")
         raise HTTPException(
@@ -442,52 +301,7 @@ async def get_store_orders(store_id: str, request: Request):
         # Format orders for response
         formatted_orders = []
         for order in orders.items:
-            stores_dict = {}
-            order_items = order.expand.get('order_items_via_order', [])
-
-            # Process items for this store
-            for item in order_items:
-                if not hasattr(item, 'expand') or not item.expand.get('store_item'):
-                    continue
-
-                store_item = item.expand['store_item']
-                if not hasattr(store_item, 'expand') or not store_item.expand.get('store'):
-                    continue
-
-                store = store_item.expand['store']
-                store_id_key = store.id
-                if store_id_key not in stores_dict:
-                    stores_dict[store_id_key] = {
-                        'store': {
-                            'id': store.id,
-                            'name': store.name,
-                            'latitude': getattr(store, 'latitude', None),
-                            'longitude': getattr(store, 'longitude', None)
-                        },
-                        'items': []
-                    }
-
-                stores_dict[store_id_key]['items'].append({
-                    'id': item.id,
-                    'name': store_item.name,
-                    'quantity': item.quantity,
-                    'price': item.price_at_time
-                })
-
-            delivery_address = order.delivery_address if hasattr(order, 'delivery_address') else None
-
-            formatted_order = {
-                'id': order.id,
-                'created': order.created,
-                'status': order.status,
-                'payment_status': order.payment_status,
-                'delivery_fee': order.delivery_fee,
-                'total_amount': order.total_amount,
-                'tax_amount': order.tax_amount,
-                'delivery_address': delivery_address,
-                'stores': list(stores_dict.values())
-            }
-            formatted_orders.append(formatted_order)
+            formatted_orders.append(serialize_order(order))
 
         return formatted_orders
     except HTTPException:
