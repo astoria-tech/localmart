@@ -35,6 +35,7 @@ export interface Profile {
 
 export interface Order {
   id: string;
+  order_id: string;
   created: string;
   status: string;
   payment_status: string;
@@ -51,6 +52,8 @@ export interface Order {
     customer_phone?: string;
   };
   customer_phone?: string;
+  scheduled_delivery_start?: string;
+  scheduled_delivery_end?: string;
   stores: {
     store: {
       id: string;
@@ -122,6 +125,9 @@ export interface OrderCreateData {
     zip_code: string;
     country: string;
   };
+  scheduled_delivery_start?: string;
+  scheduled_delivery_end?: string;
+  customer_notes?: string;
 }
 
 // Helper function to handle API responses
@@ -160,14 +166,14 @@ export const authApi = {
   },
 
   getProfile: async (token: string): Promise<Profile> => {
-    const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
+    const response = await fetch(`${config.apiUrl}/api/v0/user/profile`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return handleResponse(response);
   },
 
   updateProfile: async (token: string, profile: Partial<Profile>): Promise<Profile> => {
-    const response = await fetch(`${config.apiUrl}/api/v0/auth/profile`, {
+    const response = await fetch(`${config.apiUrl}/api/v0/user/profile`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -347,7 +353,7 @@ export const paymentApi = {
     return handleResponse(response);
   },
 
-  createSetupIntent: async (token: string): Promise<{ clientSecret: string }> => {
+  createSetupIntent: async (token: string): Promise<{ client_secret: string }> => {
     const response = await fetch(`${config.apiUrl}/api/v0/payment/setup-intent`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },

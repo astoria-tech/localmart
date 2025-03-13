@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
-import { config } from '@/config';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useRouter } from 'next/navigation';
@@ -59,15 +58,89 @@ const paymentStatusLabels = {
 };
 
 const formatDateTime = (isoString: string) => {
-  // Parse the UTC time string and create a Date object
-  const utcDate = new Date(isoString + 'Z'); // Ensure UTC interpretation by appending Z
-  
-  // Format in local timezone
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }).format(utcDate);
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedIsoString = isoString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedIsoString.endsWith('Z') ? fixedIsoString : fixedIsoString + 'Z';
+    
+    // Parse the UTC time string and create a Date object
+    const date = new Date(utcString);
+    
+    // Format in local timezone
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return isoString; // Return the original string if formatting fails
+  }
+};
+
+// Helper function to safely format dates
+const safeFormatTime = (dateString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedDateString = dateString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedDateString.endsWith('Z') ? fixedDateString : fixedDateString + 'Z';
+    
+    return new Date(utcString).toLocaleTimeString([], {
+      hour: '2-digit', 
+      minute: '2-digit',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
+};
+
+// Function to determine if a date is today
+const isToday = (dateString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedDateString = dateString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedDateString.endsWith('Z') ? fixedDateString : fixedDateString + 'Z';
+    
+    const date = new Date(utcString);
+    const today = new Date();
+    
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  } catch (error) {
+    console.error('Error checking if date is today:', error);
+    return false;
+  }
+};
+
+// Function to determine if a date is tomorrow
+const isTomorrow = (dateString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedDateString = dateString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedDateString.endsWith('Z') ? fixedDateString : fixedDateString + 'Z';
+    
+    const date = new Date(utcString);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return date.getDate() === tomorrow.getDate() &&
+      date.getMonth() === tomorrow.getMonth() &&
+      date.getFullYear() === tomorrow.getFullYear();
+  } catch (error) {
+    console.error('Error checking if date is tomorrow:', error);
+    return false;
+  }
 };
 
 function calculateMetrics(orders: Order[]) {
@@ -175,7 +248,7 @@ export default function OrdersDashboard() {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
       order.id.toLowerCase().includes(searchLower) ||
-      order.delivery_address?.customer_name.toLowerCase().includes(searchLower);
+      (order.delivery_address?.customer_name?.toLowerCase().includes(searchLower) || false);
     return matchesStatus && matchesSearch;
   });
 
@@ -467,6 +540,9 @@ export default function OrdersDashboard() {
                   Date & Time
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
+                  Scheduled Delivery
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
                   Customer
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#2D3748] uppercase tracking-wider">
@@ -506,6 +582,22 @@ export default function OrdersDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
                       {formatDateTime(order.created)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#4A5568]">
+                      {order.scheduled_delivery_start && order.scheduled_delivery_end ? (
+                        <div className="flex items-center gap-1">
+                          {isToday(order.scheduled_delivery_start) ? (
+                            <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">Same Day</span>
+                          ) : isTomorrow(order.scheduled_delivery_start) ? (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Next Day</span>
+                          ) : null}
+                          <span>
+                            {safeFormatTime(order.scheduled_delivery_start)} - {safeFormatTime(order.scheduled_delivery_end)}
+                          </span>
+                        </div>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2D3748]">
                       {order.delivery_address?.customer_name || '-'}

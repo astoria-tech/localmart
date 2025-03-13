@@ -25,7 +25,7 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     try {
       // Get setup intent from backend
-      const { clientSecret } = await paymentApi.createSetupIntent(user.token);
+      const { client_secret: clientSecret } = await paymentApi.createSetupIntent(user.token);
 
       // Confirm card setup
       const result = await stripe.confirmCardSetup(clientSecret, {
