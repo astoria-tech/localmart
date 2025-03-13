@@ -113,7 +113,7 @@ async def create_order(request: Dict, req: Request):
         )
 
         # Create the order in PocketBase with simplified fields
-        order = pb(token).create('orders', {
+        order_data = {
             'user': request['user_id'],
             'store': request['store_id'],
             'status': 'pending',  # Initial status
@@ -132,7 +132,16 @@ async def create_order(request: Dict, req: Request):
                 'longitude': request['delivery_address'].get('longitude', getattr(user, 'longitude', None))
             },
             'customer_notes': request.get('customer_notes', ''),
-        })
+        }
+        
+        # Add scheduled delivery time if provided
+        if 'scheduled_delivery_start' in request and request['scheduled_delivery_start']:
+            order_data['scheduled_delivery_start'] = request['scheduled_delivery_start']
+        
+        if 'scheduled_delivery_end' in request and request['scheduled_delivery_end']:
+            order_data['scheduled_delivery_end'] = request['scheduled_delivery_end']
+
+        order = pb(token).create('orders', order_data)
 
         # Create order items
         for item in request['items']:

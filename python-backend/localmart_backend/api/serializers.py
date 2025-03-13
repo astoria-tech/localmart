@@ -75,6 +75,8 @@ def serialize_order(order) -> Dict:
         'total_amount': order.total_amount,
         'tax_amount': order.tax_amount,
         'delivery_address': delivery_address,
+        'scheduled_delivery_start': getattr(order, 'scheduled_delivery_start', None),
+        'scheduled_delivery_end': getattr(order, 'scheduled_delivery_end', None),
         'stores': list(stores_dict.values())
     }
 

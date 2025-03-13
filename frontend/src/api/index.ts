@@ -35,6 +35,7 @@ export interface Profile {
 
 export interface Order {
   id: string;
+  order_id: string;
   created: string;
   status: string;
   payment_status: string;
@@ -51,6 +52,8 @@ export interface Order {
     customer_phone?: string;
   };
   customer_phone?: string;
+  scheduled_delivery_start?: string;
+  scheduled_delivery_end?: string;
   stores: {
     store: {
       id: string;
@@ -122,6 +125,9 @@ export interface OrderCreateData {
     zip_code: string;
     country: string;
   };
+  scheduled_delivery_start?: string;
+  scheduled_delivery_end?: string;
+  customer_notes?: string;
 }
 
 // Helper function to handle API responses

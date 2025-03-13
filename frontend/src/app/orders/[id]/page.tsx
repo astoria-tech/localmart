@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { formatCurrency } from '@/utils/currency';
-import { MapPinIcon, BuildingStorefrontIcon, XMarkIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, BuildingStorefrontIcon, XMarkIcon, ClockIcon, CalendarIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
@@ -77,12 +77,107 @@ const DeliveryMarker = () => (
 );
 
 const formatDateTime = (isoString: string) => {
-  const utcDate = new Date(isoString + 'Z');
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }).format(utcDate);
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedIsoString = isoString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedIsoString.endsWith('Z') ? fixedIsoString : fixedIsoString + 'Z';
+    
+    const date = new Date(utcString);
+    
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return isoString; // Return the original string if formatting fails
+  }
+};
+
+const formatDate = (isoString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedIsoString = isoString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedIsoString.endsWith('Z') ? fixedIsoString : fixedIsoString + 'Z';
+    
+    const date = new Date(utcString);
+    
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'full',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return isoString; // Return the original string if formatting fails
+  }
+};
+
+const formatTime = (isoString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedIsoString = isoString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedIsoString.endsWith('Z') ? fixedIsoString : fixedIsoString + 'Z';
+    
+    const date = new Date(utcString);
+    
+    return new Intl.DateTimeFormat('en-US', {
+      timeStyle: 'short',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return isoString; // Return the original string if formatting fails
+  }
+};
+
+// Function to determine if a date is today
+const isToday = (dateString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedDateString = dateString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedDateString.endsWith('Z') ? fixedDateString : fixedDateString + 'Z';
+    
+    const date = new Date(utcString);
+    const today = new Date();
+    
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  } catch (error) {
+    console.error('Error checking if date is today:', error);
+    return false;
+  }
+};
+
+// Function to determine if a date is tomorrow
+const isTomorrow = (dateString: string) => {
+  try {
+    // Replace space with 'T' to make it a valid ISO string if needed
+    const fixedDateString = dateString.replace(' ', 'T');
+    
+    // Ensure UTC interpretation by appending Z if not present
+    const utcString = fixedDateString.endsWith('Z') ? fixedDateString : fixedDateString + 'Z';
+    
+    const date = new Date(utcString);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return date.getDate() === tomorrow.getDate() &&
+      date.getMonth() === tomorrow.getMonth() &&
+      date.getFullYear() === tomorrow.getFullYear();
+  } catch (error) {
+    console.error('Error checking if date is tomorrow:', error);
+    return false;
+  }
 };
 
 export default function OrderViewPage() {
@@ -341,9 +436,45 @@ export default function OrderViewPage() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-[#4A5568]">
-              <ClockIcon className="w-4 h-4" />
-              <time dateTime={order.created}>{formatDateTime(order.created)}</time>
+            
+            {/* Order Timeline Section */}
+            <div className="mt-4 space-y-3">
+              <div className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
+                <ClockIcon className="w-5 h-5 text-[#2A9D8F] flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="text-[#4A5568]">Order Placed</p>
+                  <p className="font-medium text-[#2D3748]">
+                    {formatDateTime(order.created)}
+                  </p>
+                </div>
+              </div>
+              
+              {order.scheduled_delivery_start && order.scheduled_delivery_end && (
+                <div className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
+                  <TruckIcon className="w-5 h-5 text-[#2A9D8F] flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="text-[#4A5568]">Scheduled Delivery</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {isToday(order.scheduled_delivery_start) ? (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">Same Day</span>
+                      ) : isTomorrow(order.scheduled_delivery_start) ? (
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Next Day</span>
+                      ) : null}
+                      <p className="font-medium text-[#2D3748]">
+                        {formatDate(order.scheduled_delivery_start)}
+                      </p>
+                    </div>
+                    <div className="mt-1 px-3 py-2 bg-[#2A9D8F]/10 rounded-md">
+                      <p className="font-medium text-[#2A9D8F]">
+                        {formatTime(order.scheduled_delivery_start)} - {formatTime(order.scheduled_delivery_end)}
+                      </p>
+                      <p className="text-xs text-[#4A5568] mt-1">
+                        Our delivery partner will arrive during this time window
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
