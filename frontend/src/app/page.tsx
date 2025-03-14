@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BuildingStorefrontIcon, PlusIcon, ShoppingCartIcon, StarIcon } from '@heroicons/react/24/outline';
+import { BuildingStorefrontIcon, ClockIcon, HomeIcon, ShoppingCartIcon, StarIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { SearchProvider } from '@/app/contexts/search';
 import { Search } from '@/components/Search';
 import { useFeatureFlag } from '@/app/contexts/featureFlags';
@@ -14,6 +14,7 @@ export default function Page() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
   const productSearchEnabled = useFeatureFlag('product_search');
   const { addItem, items: cartItems } = useCart();
 
@@ -54,7 +55,7 @@ export default function Page() {
           <div className="animate-pulse space-y-8">
             {/* Hero section skeleton */}
             <div className="h-64 bg-white/50 rounded-lg"></div>
-            {/* Promo banner skeleton */}
+            {/* Info section skeleton */}
             <div className="h-24 bg-white/50 rounded-lg"></div>
             {/* Items flow skeleton */}
             <div className="flex flex-wrap gap-3">
@@ -97,8 +98,8 @@ export default function Page() {
 
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-b from-[#2A9D8F]/20 to-transparent pt-24 pb-10 relative overflow-hidden">
+      {/* Unified Hero Section with Info */}
+      <div className="bg-gradient-to-b from-[#2A9D8F]/20 to-transparent pt-24 pb-6 relative overflow-hidden">
         {/* Decorative Background Pattern */}
         <div className="absolute inset-0 opacity-[0.15]" style={{ 
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232A9D8F' fill-rule='evenodd'%3E%3Cg fill-rule='nonzero'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -109,15 +110,31 @@ export default function Page() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#2A9D8F]/10 via-transparent to-[#2A9D8F]/5" />
         
         <div className="container mx-auto px-4 relative">
-          <div className="flex flex-col md:flex-row justify-between items-center">
+          {/* Top Section */}
+          <div className="flex flex-col md:flex-row justify-between items-center mb-8">
             {/* Region Select */}
-            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-lg ring-1 ring-[#2A9D8F]/20 mb-6 md:mb-0">
-              <label htmlFor="region-select" className="block text-base font-semibold text-[#2D3748] mb-2">
-                Neighborhood
-              </label>
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-sm ring-1 ring-[#2A9D8F]/20 mb-6 md:mb-0 w-full md:w-auto">
+              <div className="flex items-center mb-2">
+                <label htmlFor="region-select" className="block text-base font-semibold text-[#2D3748]">
+                  Neighborhood
+                </label>
+                <div className="relative ml-2">
+                  <InformationCircleIcon
+                    className="h-5 w-5 text-[#2A9D8F] cursor-help"
+                    onMouseEnter={() => setShowTooltip(true)}
+                    onMouseLeave={() => setShowTooltip(false)}
+                  />
+                  {showTooltip && (
+                    <div className="absolute z-50 w-64 px-4 py-3 text-sm text-white bg-[#2D3748] rounded-lg shadow-lg left-6 top-0 ml-1">
+                      <p>We're currently only serving Astoria (because we live here!) 🏡</p>
+                      <div className="absolute w-3 h-3 bg-[#2D3748] transform rotate-45 -left-1.5 top-1/2 -mt-1.5"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <select
                 id="region-select"
-                className="w-56 rounded-lg border-2 border-[#2A9D8F]/30 bg-white py-2 px-4 text-base shadow-sm 
+                className="w-full md:w-56 rounded-lg border-2 border-[#2A9D8F]/30 bg-white py-2 px-4 text-base shadow-sm 
                   focus:border-[#2A9D8F] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/20 
                   text-[#2D3748] font-medium hover:border-[#2A9D8F]/50 transition-colors"
                 defaultValue="astoria"
@@ -128,48 +145,66 @@ export default function Page() {
 
             {/* Main Hero Content */}
             <div className="max-w-xl text-center md:text-right">
-              <div className="flex items-center justify-center md:justify-end gap-3 mb-4">
+              <div className="flex items-center justify-center md:justify-end gap-3 mb-3">
                 <h1 className="text-4xl font-bold text-[#2D3748] font-display">localmart</h1>
-                <BuildingStorefrontIcon className="h-12 w-12 text-[#2A9D8F]" />
+                <BuildingStorefrontIcon className="h-10 w-10 text-[#2A9D8F]" />
               </div>
-              <p className="text-lg text-[#4A5568] mb-6 leading-relaxed">
+              <p className="text-lg text-[#4A5568] leading-relaxed">
                 Shop local. Same-day delivery.
                 <br />
                 From your favorite neighborhood stores.
               </p>
-              <SearchProvider>
-                {productSearchEnabled && <Search />}
-              </SearchProvider>
+              <div className="mt-4">
+                <SearchProvider>
+                  {productSearchEnabled && <Search />}
+                </SearchProvider>
+              </div>
+            </div>
+          </div>
+          
+          {/* Info Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Delivery Information Card */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-[#2A9D8F]/10 overflow-hidden">
+              <div className="flex items-center bg-[#2A9D8F]/10 px-4 py-2">
+                <ClockIcon className="h-5 w-5 text-[#2A9D8F] mr-2" />
+                <h4 className="text-base font-semibold text-[#2D3748]">How Delivery Works</h4>
+              </div>
+              <div className="p-4">
+                <ul className="space-y-2">
+                  <li className="flex items-start">
+                    <div className="flex-shrink-0 mr-2 mt-1">
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#2A9D8F]"></div>
+                    </div>
+                    <p className="text-sm text-[#4A5568]">Order before 3PM for same-day delivery. Later orders delivered next day.</p>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="flex-shrink-0 mr-2 mt-1">
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#2A9D8F]"></div>
+                    </div>
+                    <p className="text-sm text-[#4A5568]">All deliveries are scheduled in 1-hour windows.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            {/* Local Stores Card */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-[#2A9D8F]/10 overflow-hidden">
+              <div className="flex items-center bg-[#2A9D8F]/10 px-4 py-2">
+                <HomeIcon className="h-5 w-5 text-[#2A9D8F] mr-2" />
+                <h4 className="text-base font-semibold text-[#2D3748]">Local Stores Only</h4>
+              </div>
+              <div className="p-4">
+                <p className="text-sm text-[#4A5568]">We only list items from local businesses in your neighborhood.</p>
+                <p className="text-sm text-[#4A5568] mt-2 font-medium">No chains allowed.</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content Container */}
-      <div className="container mx-auto px-4 -mt-4">
-        {/* Promotional Banner */}
-        <div className="bg-gradient-to-r from-[#2A9D8F]/20 via-[#2A9D8F]/10 to-[#2A9D8F]/5 rounded-xl overflow-hidden shadow-sm relative mb-8">
-          {/* Decorative Elements */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#2A9D8F]/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#2A9D8F]/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
-          
-          <div className="relative p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 mr-6 hidden md:block">
-                <div className="bg-white/80 backdrop-blur-sm p-3 rounded-full shadow-sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#2A9D8F]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                </div>
-              </div>
-              <div className="max-w-xl">
-                <h3 className="text-xl font-bold text-[#2D3748] mb-2">Free Delivery on Your First Order</h3>
-                <p className="text-[#4A5568]">Use code <span className="inline-block bg-white/70 backdrop-blur-sm px-2 py-0.5 rounded font-semibold text-[#2A9D8F] shadow-sm">FIRSTORDER</span> at checkout</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div className="container mx-auto px-4 py-6">
         {/* Section Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-[#2D3748]">Shop Local Favorites</h2>
