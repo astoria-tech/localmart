@@ -349,9 +349,9 @@ export default function OrderViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F2EB] pt-16 relative">
-      {/* Map Background */}
-      <div className="absolute inset-0 pt-16">
+    <div className="h-screen overflow-hidden bg-[#F5F2EB] pt-16 relative">
+      {/* Map Background - Fill entire screen */}
+      <div className="absolute inset-0 pt-16 z-0">
         {mapReady && leafletLoaded && (
           <MapContainer
             center={[
@@ -408,145 +408,124 @@ export default function OrderViewPage() {
         )}
       </div>
 
-      {/* Floating Order Panel */}
-      <div className="absolute left-8 top-24 w-full max-w-lg z-10">
-        {/* Back Button */}
-        <button
-          onClick={() => router.back()}
-          className="mb-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#4A5568] bg-white/90 rounded-lg hover:bg-white transition-colors shadow-sm"
-        >
-          <XMarkIcon className="w-4 h-4" />
-          <span>Back</span>
-        </button>
-
-        {/* Main Order Card */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-white/20">
-          {/* Header Section */}
-          <div className="bg-[#2A9D8F]/10 px-6 py-5 border-b border-[#2A9D8F]/10">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-[#2D3748]">
-                Order #{order.id.slice(-6)}
-              </h1>
-              <div className="flex items-center gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
-                  {getPaymentStatusLabel(order.payment_status)}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+      {/* Order Panel - Compact design */}
+      <div className="absolute left-8 top-24 w-full max-w-md z-10 max-h-[calc(100vh-120px)]">
+        {/* Card with integrated header and back button */}
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-white/20 flex flex-col">
+          {/* Header with back button */}
+          <div className="bg-[#2A9D8F] px-4 py-4 text-white">
+            <div className="flex items-center mb-2">
+              <button
+                onClick={() => router.back()}
+                className="mr-3 p-1 rounded-full hover:bg-white/20 transition-colors"
+                aria-label="Back"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+              <h1 className="text-xl font-bold">Order #{order.id.slice(-6)}</h1>
+              <div className="ml-auto">
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                   {getStatusLabel(order.status)}
                 </span>
               </div>
             </div>
-            
-            {/* Order Timeline Section */}
-            <div className="mt-4 space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
-                <ClockIcon className="w-5 h-5 text-[#2A9D8F] flex-shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="text-[#4A5568]">Order Placed</p>
-                  <p className="font-medium text-[#2D3748]">
-                    {formatDateTime(order.created)}
-                  </p>
-                </div>
+            <div className="flex items-center justify-between text-white/80 text-xs">
+              <div className="flex items-center">
+                <ClockIcon className="w-3 h-3 mr-1" />
+                {formatDateTime(order.created)}
               </div>
-              
-              {order.scheduled_delivery_start && order.scheduled_delivery_end && (
-                <div className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
-                  <TruckIcon className="w-5 h-5 text-[#2A9D8F] flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="text-[#4A5568]">Scheduled Delivery</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {isToday(order.scheduled_delivery_start) ? (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">Same Day</span>
-                      ) : isTomorrow(order.scheduled_delivery_start) ? (
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Next Day</span>
-                      ) : null}
-                      <p className="font-medium text-[#2D3748]">
-                        {formatDate(order.scheduled_delivery_start)}
-                      </p>
-                    </div>
-                    <div className="mt-1 px-3 py-2 bg-[#2A9D8F]/10 rounded-md">
-                      <p className="font-medium text-[#2A9D8F]">
-                        {formatTime(order.scheduled_delivery_start)} - {formatTime(order.scheduled_delivery_end)}
-                      </p>
-                      <p className="text-xs text-[#4A5568] mt-1">
-                        Our delivery partner will arrive during this time window
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
+                {getPaymentStatusLabel(order.payment_status)}
+              </span>
             </div>
           </div>
 
-          <div className="divide-y divide-[#2A9D8F]/10">
+          {/* Content area */}
+          <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 220px)" }}>
             {/* Order Items Section */}
-            <div className="p-6">
-              <h2 className="text-sm font-medium text-[#2D3748] uppercase tracking-wider mb-3">Order Details</h2>
-              <div className="space-y-6">
-                {order.stores.map((store) => (
-                  <div key={store.store.id} className="bg-white/50 rounded-lg border border-[#2A9D8F]/10">
-                    <div className="px-4 py-3 border-b border-[#2A9D8F]/10 flex items-center gap-2">
-                      <BuildingStorefrontIcon className="w-4 h-4 text-[#2A9D8F]" />
-                      <h3 className="font-medium text-[#2D3748]">{store.store.name}</h3>
+            <div className="p-4 border-b border-[#2A9D8F]/10">
+              <div className="flex items-center gap-2 mb-3">
+                <BuildingStorefrontIcon className="w-4 h-4 text-[#2A9D8F]" />
+                <h3 className="text-base font-medium text-[#2D3748]">{order.stores[0]?.store.name}</h3>
+              </div>
+              <div className="space-y-2">
+                {order.stores.flatMap(store => 
+                  store.items.map(item => (
+                    <div key={item.id} className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 flex items-center justify-center bg-[#2A9D8F]/10 rounded text-[#2A9D8F] font-medium text-xs">
+                          {item.quantity}
+                        </span>
+                        <span className="text-[#2D3748]">{item.name}</span>
+                      </div>
+                      <span className="text-[#4A5568] font-medium">{formatCurrency(item.price * item.quantity)}</span>
                     </div>
-                    <div className="p-4 space-y-2">
-                      {store.items.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center text-sm">
-                          <div className="flex items-center gap-3">
-                            <span className="w-6 h-6 flex items-center justify-center bg-[#2A9D8F]/10 rounded text-[#2A9D8F] font-medium">
-                              {item.quantity}
-                            </span>
-                            <span className="text-[#2D3748]">{item.name}</span>
-                          </div>
-                          <span className="text-[#4A5568] font-medium">{formatCurrency(item.price * item.quantity)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
+
+            {/* Delivery Schedule Section */}
+            {order.scheduled_delivery_start && order.scheduled_delivery_end && (
+              <div className="p-4 border-b border-[#2A9D8F]/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <TruckIcon className="w-4 h-4 text-[#2A9D8F]" />
+                  <h3 className="text-base font-medium text-[#2D3748]">Delivery Schedule</h3>
+                </div>
+                <div className="ml-6 text-sm">
+                  <p className="text-[#2D3748]">{formatDate(order.scheduled_delivery_start)}</p>
+                  <div className="mt-1 px-3 py-2 bg-[#2A9D8F]/10 rounded-md">
+                    <p className="font-medium text-[#2A9D8F]">
+                      {formatTime(order.scheduled_delivery_start)} - {formatTime(order.scheduled_delivery_end)}
+                    </p>
+                    <p className="text-xs text-[#4A5568] mt-1">
+                      Our delivery partner will arrive during this time window
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Delivery Address Section */}
-            <div className="p-6">
-              <h2 className="text-sm font-medium text-[#2D3748] uppercase tracking-wider mb-3">Delivery Address</h2>
-              <div className="flex items-start gap-3 p-4 bg-[#2A9D8F]/5 rounded-lg">
-                <MapPinIcon className="w-5 h-5 text-[#2A9D8F] flex-shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  {order.delivery_address ? (
-                    <>
-                      <p className="font-medium text-[#2D3748]">{order.delivery_address.street_address.filter(Boolean).join(', ')}</p>
-                      <p className="text-[#4A5568]">{order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}</p>
-                    </>
-                  ) : (
-                    <p className="italic text-[#4A5568]">No address available</p>
-                  )}
-                </div>
+            <div className="p-4 border-b border-[#2A9D8F]/10">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPinIcon className="w-4 h-4 text-[#2A9D8F]" />
+                <h3 className="text-base font-medium text-[#2D3748]">Delivery Address</h3>
+              </div>
+              <div className="ml-6 text-sm">
+                {order.delivery_address ? (
+                  <>
+                    <p className="text-[#2D3748]">{order.delivery_address.street_address.filter(Boolean).join(', ')}</p>
+                    <p className="text-[#4A5568]">{order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}</p>
+                  </>
+                ) : (
+                  <p className="italic text-[#4A5568]">No address available</p>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* Price Breakdown Section */}
-            <div className="p-6 bg-[#2A9D8F]/5">
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center text-[#4A5568]">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(order.stores.reduce((acc, store) => 
-                    acc + store.items.reduce((itemAcc, item) => itemAcc + (item.price * item.quantity), 0), 0
-                  ))}</span>
-                </div>
-                <div className="flex justify-between items-center text-[#4A5568]">
-                  <span>Tax</span>
-                  <span>{formatCurrency(order.tax_amount || 0)}</span>
-                </div>
-                <div className="flex justify-between items-center text-[#4A5568]">
-                  <span>Delivery Fee</span>
-                  <span>{formatCurrency(order.delivery_fee)}</span>
-                </div>
-                <div className="pt-3 border-t border-[#2A9D8F]/10">
-                  <div className="flex justify-between items-center text-lg font-medium text-[#2D3748]">
-                    <span>Total</span>
-                    <span>{formatCurrency(order.total_amount)}</span>
-                  </div>
+          {/* Price Breakdown Section - Fixed at bottom */}
+          <div className="p-4 bg-[#2A9D8F]/5 border-t border-[#2A9D8F]/10">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center text-[#4A5568]">
+                <span>Subtotal</span>
+                <span>{formatCurrency(order.stores.reduce((acc, store) => 
+                  acc + store.items.reduce((itemAcc, item) => itemAcc + (item.price * item.quantity), 0), 0
+                ))}</span>
+              </div>
+              <div className="flex justify-between items-center text-[#4A5568]">
+                <span>Tax</span>
+                <span>{formatCurrency(order.tax_amount || 0)}</span>
+              </div>
+              <div className="flex justify-between items-center text-[#4A5568]">
+                <span>Delivery Fee</span>
+                <span>{formatCurrency(order.delivery_fee)}</span>
+              </div>
+              <div className="pt-2 border-t border-[#2A9D8F]/10">
+                <div className="flex justify-between items-center font-medium text-[#2D3748]">
+                  <span>Total</span>
+                  <span>{formatCurrency(order.total_amount)}</span>
                 </div>
               </div>
             </div>

@@ -15,9 +15,20 @@ geocoding_service = GeocodingService()
 router = APIRouter(tags=["stores"])
 
 @router.get("/api/v0/stores", response_model=List[Dict])
-async def list_stores():
+async def list_stores(request: Request = None):
     """List all stores"""
     try:
+        # Check if request has authorization header
+        is_admin = False
+        if request and request.headers.get('authorization'):
+            try:
+                token = get_token_from_request(request)
+                user = pb().get_user_from_token(token)
+                is_admin = 'admin' in (getattr(user, 'roles', []) or [])
+            except Exception:
+                # If token validation fails, continue as non-admin
+                pass
+        
         # Get all records from the stores collection
         stores = pb().get_list('stores', 1, 50)
 

@@ -5,7 +5,7 @@ import { useCart } from '@/app/contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
-import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { config } from '@/config';
 import { useStoreRoles } from '@/app/hooks/useStoreRoles';
 import Link from 'next/link';
@@ -41,8 +41,8 @@ export default function StoreContent({ storeId }: { storeId: string }) {
 
   if (loading) {
     return (
-      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB] pt-16">
-        <div className="container mx-auto px-4">
+      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
+        <div className="pt-16 container mx-auto px-4">
           <div className="animate-pulse">
             <div className="h-32 bg-white/50 rounded-lg mb-8"></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -58,8 +58,8 @@ export default function StoreContent({ storeId }: { storeId: string }) {
 
   if (error || !store) {
     return (
-      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB] pt-16">
-        <div className="container mx-auto px-4">
+      <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
+        <div className="pt-16 container mx-auto px-4">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-[#2D3748]">Error</h2>
             <p className="mt-2 text-[#4A5568]">{error || 'Store not found'}</p>
@@ -72,41 +72,50 @@ export default function StoreContent({ storeId }: { storeId: string }) {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
       {/* Hero Section */}
-      <div className="bg-white/50 backdrop-blur-sm border-b pt-24">
-        <div className="h-32 bg-gradient-to-r from-[#2A9D8F]/10 to-[#2A9D8F]/5 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-5"></div>
-          <div className="container mx-auto px-4 h-full">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between h-full py-6">
+      <div className="bg-gradient-to-r from-[#2A9D8F]/15 to-[#2A9D8F]/5 border-b shadow-sm pt-16">
+        <div className="h-auto min-h-40 relative overflow-hidden">
+          {/* Decorative Background Pattern - Replacing the missing pattern-bg.png */}
+          <div className="absolute inset-0 opacity-[0.15]" style={{ 
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232A9D8F' fill-rule='evenodd'%3E%3Cg fill-rule='nonzero'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundSize: '52px 26px'
+          }} />
+          
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#2A9D8F]/10 via-transparent to-[#2A9D8F]/10" />
+          
+          <div className="container mx-auto px-4 h-full relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between h-full py-8 pt-10">
               {/* Store Name and Type */}
-              <div className="relative z-10">
-                <h1 className="text-2xl font-bold text-[#2D3748]">{store.name}</h1>
-                <p className="text-[#4A5568] text-sm">Local market & grocery</p>
+              <div className="relative">
+                <h1 className="text-3xl md:text-4xl font-bold text-[#2D3748] mb-2 transition-colors">{store.name}</h1>
+                
                 {/* Vendor Links */}
                 {isAdmin && (
-                  <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-4 mt-3">
                     <Link
                       href={`/store/${storeId}/dashboard`}
-                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1"
+                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1 bg-white/50 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-sm hover:shadow"
                     >
                       <ChartBarIcon className="w-4 h-4" />
                       <span>View Orders</span>
                     </Link>
                     <Link
                       href={`/store/${storeId}/inventory`}
-                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1"
+                      className="text-sm text-[#2A9D8F] hover:text-[#40B4A6] transition-colors flex items-center gap-1 bg-white/50 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-sm hover:shadow"
                     >
                       <ShoppingBagIcon className="w-4 h-4" />
                       <span>Manage Inventory</span>
                     </Link>
                   </div>
                 )}
+                
                 {/* Social Links */}
-                <div className="flex gap-3 mt-3">
+                <div className="flex gap-3 mt-4">
                   <a
                     href="https://instagram.com/kinshipcoffee"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors bg-white/50 backdrop-blur-sm p-2 rounded-full shadow-sm hover:shadow"
                     aria-label="Instagram"
                   >
                     <FaInstagram className="w-5 h-5" />
@@ -115,7 +124,7 @@ export default function StoreContent({ storeId }: { storeId: string }) {
                     href="https://facebook.com/kinshipcoffee"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors bg-white/50 backdrop-blur-sm p-2 rounded-full shadow-sm hover:shadow"
                     aria-label="Facebook"
                   >
                     <FaFacebook className="w-5 h-5" />
@@ -124,7 +133,7 @@ export default function StoreContent({ storeId }: { storeId: string }) {
                     href="https://x.com/kinshipcoffee"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors bg-white/50 backdrop-blur-sm p-2 rounded-full shadow-sm hover:shadow"
                     aria-label="X (formerly Twitter)"
                   >
                     <FaXTwitter className="w-5 h-5" />
@@ -133,7 +142,7 @@ export default function StoreContent({ storeId }: { storeId: string }) {
                     href="https://bsky.app/profile/kinshipcoffee.bsky.social"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors"
+                    className="text-[#4A5568] hover:text-[#2A9D8F] transition-colors bg-white/50 backdrop-blur-sm p-2 rounded-full shadow-sm hover:shadow"
                     aria-label="Bluesky Social"
                   >
                     <SiBluesky className="w-5 h-5" />
@@ -142,22 +151,28 @@ export default function StoreContent({ storeId }: { storeId: string }) {
               </div>
 
               {/* Store Info */}
-              <div className="flex flex-col md:flex-row gap-6 md:items-center mt-4 md:mt-0">
+              <div className="flex flex-col gap-4 mt-6 md:mt-0 bg-white/60 backdrop-blur-sm p-4 rounded-lg shadow-sm">
                 {/* Hours */}
-                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
-                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
+                <div className="flex items-center gap-3 text-[#4A5568]">
+                  <div className="p-2 bg-[#2A9D8F]/10 rounded-lg">
+                    <ClockIcon className="w-5 h-5 text-[#2A9D8F]" />
+                  </div>
                   <div>
-                    <p>Mon-Fri 8am-9pm</p>
-                    <p>Sat-Sun 9am-8pm</p>
+                    <p className="font-medium text-[#2D3748] text-sm mb-1">Hours</p>
+                    <p className="text-sm">Mon-Fri 8am-9pm</p>
+                    <p className="text-sm">Sat-Sun 9am-8pm</p>
                   </div>
                 </div>
 
                 {/* Location */}
-                <div className="flex items-center gap-2 text-[#4A5568] text-sm">
-                  <MapPinIcon className="w-4 h-4 flex-shrink-0" />
+                <div className="flex items-center gap-3 text-[#4A5568]">
+                  <div className="p-2 bg-[#2A9D8F]/10 rounded-lg">
+                    <MapPinIcon className="w-5 h-5 text-[#2A9D8F]" />
+                  </div>
                   <div>
-                    <p>{store.street_1}</p>
-                    <p>{store.city}, {store.state} {store.zip_code}</p>
+                    <p className="font-medium text-[#2D3748] text-sm mb-1">Location</p>
+                    <p className="text-sm">{store.street_1}</p>
+                    <p className="text-sm">{store.city}, {store.state} {store.zip_code}</p>
                   </div>
                 </div>
               </div>
@@ -172,31 +187,38 @@ export default function StoreContent({ storeId }: { storeId: string }) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-4 hover:bg-white overflow-hidden"
+              className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-100 hover:border-[#2A9D8F]/20"
             >
-              <div className="aspect-w-4 aspect-h-3 mb-3 rounded-md overflow-hidden">
+              <div className="aspect-w-1 aspect-h-1 bg-gray-50">
                 <img
                   src={item.imageUrl}
                   alt={item.name}
-                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
                 />
               </div>
-              <h3 className="text-base font-semibold text-[#2D3748] mb-1">{item.name}</h3>
-              <p className="text-[#4A5568] mb-3">${item.price.toFixed(2)}</p>
-              <button
-                onClick={() => {
-                  addItem({
-                    ...item,
-                    store: storeId
-                  });
-                  if (!hasItemsFromDifferentStore) {
-                    toast.success('Added to cart');
-                  }
-                }}
-                className="w-full bg-[#2A9D8F] text-white py-2 px-4 rounded-md hover:bg-[#40B4A6] active:bg-[#1E7268] transition-colors duration-200"
-              >
-                Add to Cart
-              </button>
+              <div className="p-3">
+                <h3 className="text-sm font-medium text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors line-clamp-2 min-h-[2.5rem] mb-2">
+                  {item.name}
+                </h3>
+                <div className="flex items-center justify-between">
+                  <p className="text-[#2A9D8F] font-semibold">${item.price.toFixed(2)}</p>
+                  <button
+                    onClick={() => {
+                      addItem({
+                        ...item,
+                        store: storeId
+                      });
+                      if (!hasItemsFromDifferentStore) {
+                        toast.success('Added to cart');
+                      }
+                    }}
+                    className="p-1.5 text-[#2A9D8F] hover:text-white hover:bg-[#2A9D8F] rounded-full transition-colors group/btn"
+                    aria-label={`Add ${item.name} to cart`}
+                  >
+                    <ShoppingCartIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>

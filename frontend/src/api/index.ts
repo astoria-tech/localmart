@@ -247,6 +247,13 @@ export const storesApi = {
     return handleResponse(response);
   },
 
+  getAdminStores: async (token: string): Promise<Store[]> => {
+    const response = await fetch(`${config.apiUrl}/api/v0/stores`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
   getStore: async (storeId: string): Promise<Store> => {
     const response = await fetch(`${config.apiUrl}/api/v0/stores/${storeId}`);
     return handleResponse(response);

@@ -6,7 +6,8 @@ import { toast } from 'react-hot-toast';
 import { CurrencyDollarIcon, ShoppingBagIcon, ClockIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useRouter } from 'next/navigation';
-import { ordersApi, Order } from '@/api';
+import { ordersApi, Order, storesApi, Store } from '@/api';
+import Link from 'next/link';
 
 interface OrderItem {
   id: string;
@@ -234,6 +235,7 @@ function getStoreColor(index: number, opacity: number = 0.9) {
 export default function OrdersDashboard() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(Object.keys(statusLabels)));
@@ -282,25 +284,31 @@ export default function OrdersDashboard() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchData = async () => {
       try {
         // Only fetch if user is a global admin
         if (!user?.roles?.includes('admin')) {
           return;
         }
 
-        const orders = await ordersApi.getAdminOrders(user.token);
-        setOrders(orders);
+        // Fetch orders and stores in parallel
+        const [ordersData, storesData] = await Promise.all([
+          ordersApi.getAdminOrders(user.token),
+          storesApi.getAdminStores(user.token)
+        ]);
+        
+        setOrders(ordersData);
+        setStores(storesData);
       } catch (error) {
-        console.error('Error fetching orders:', error);
-        setError(error instanceof Error ? error.message : 'Failed to fetch orders');
+        console.error('Error fetching data:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch data');
       } finally {
         setLoading(false);
       }
     };
 
     if (user?.token) {
-      fetchOrders();
+      fetchData();
     }
   }, [user]);
 
@@ -319,6 +327,60 @@ export default function OrdersDashboard() {
       console.error('Error updating order status:', error);
       toast.error('Failed to update order status');
     }
+  };
+
+  // Store Dashboard Links Section
+  const renderStoreDashboardLinks = () => {
+    // Get stores from orders for color consistency
+    const storesFromOrders = calculateDailyOrderCounts(orders).stores;
+    const storeIdsFromOrders = new Set(storesFromOrders.map(store => store.id));
+    
+    // Create a map of store IDs to their index for coloring
+    const storeColorMap = new Map();
+    storesFromOrders.forEach((store, index) => {
+      storeColorMap.set(store.id, index);
+    });
+    
+    // Combine stores from orders with all stores
+    const allStores = [...stores];
+    let colorIndex = storesFromOrders.length;
+    
+    return (
+      <div className="mb-8">
+        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-[#2D3748] mb-4">Store Dashboards</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {allStores.map((store) => {
+              // Use existing color index if store is in orders, otherwise assign a new one
+              const index = storeColorMap.has(store.id) 
+                ? storeColorMap.get(store.id) 
+                : colorIndex++;
+              
+              return (
+                <Link
+                  key={store.id}
+                  href={`/store/${store.id}/dashboard`}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-[#2A9D8F]/20 hover:border-[#2A9D8F] hover:bg-[#2A9D8F]/5 transition-all group"
+                  style={{ backgroundColor: getStoreColor(index, 0.1) }}
+                >
+                  <div className="p-2 rounded-full" style={{ backgroundColor: getStoreColor(index, 0.2) }}>
+                    <ChartBarIcon className="w-5 h-5" style={{ color: getStoreColor(index) }} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors">{store.name}</h3>
+                    <p className="text-xs text-[#4A5568]">View store dashboard</p>
+                  </div>
+                  {!storeIdsFromOrders.has(store.id) && (
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">No orders</span>
+                  )}
+                  <span className="text-[#2A9D8F] group-hover:translate-x-1 transition-transform">→</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -456,6 +518,9 @@ export default function OrdersDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Store Dashboard Links */}
+        {renderStoreDashboardLinks()}
 
         {/* Filters Section */}
         <div className="mb-8">
