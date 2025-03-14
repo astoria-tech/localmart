@@ -14,6 +14,8 @@ whenever you make frontend changes, make sure you use your senior web designer h
 whenever you want to restart the backend to verify changes, use "docker compose restart backend" or whatever service, and then check the logs via "docker compose logs backend" or whatever service. this is because
 there is already a terminal running all of the services via "make". make sure you don't run docker commands that don't end, like "docker compose logs -f [service]" (specifically the -f is the issue).
 
+also remember that the frontend and backend autoreload, so you should check the logs first before restarting the services.
+
 ---
 
 ## LocalMart System Architecture
