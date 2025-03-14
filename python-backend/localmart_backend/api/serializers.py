@@ -8,12 +8,19 @@ def serialize_store(store) -> Dict:
         "id": getattr(store, "id", ""),
         "name": getattr(store, "name", ""),
         "description": getattr(store, "description", ""),
-        "address": getattr(store, "address", {}),
+        "street_1": getattr(store, "street_1", ""),
+        "street_2": getattr(store, "street_2", ""),
+        "city": getattr(store, "city", ""),
+        "state": getattr(store, "state", ""),
+        "zip_code": getattr(store, "zip", ""),  # Note: PocketBase field is 'zip' but frontend expects 'zip_code'
+        "address": getattr(store, "address", {}),  # Keep this for backward compatibility
         "hours": getattr(store, "hours", {}),
         "phone": getattr(store, "phone", ""),
         "email": getattr(store, "email", ""),
         "created": getattr(store, "created", ""),
-        "updated": getattr(store, "updated", "")
+        "updated": getattr(store, "updated", ""),
+        "latitude": getattr(store, "latitude", None),
+        "longitude": getattr(store, "longitude", None)
     }
 
 def serialize_store_item(item) -> Dict:

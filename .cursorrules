@@ -9,6 +9,11 @@ keep an eye out for security issues esp. in the API layer (like if we should be 
 if the backend should be pulling the data from the db (like when submitting an order, the prices should not be sent
 from the frontend, they should be pulled from the db)
 
+whenever you make frontend changes, make sure you use your senior web designer hat and make the changes aesthetic, functional, and user-friendly.
+
+whenever you want to restart the backend to verify changes, use "docker compose restart backend" or whatever service, and then check the logs via "docker compose logs backend" or whatever service. this is because
+there is already a terminal running all of the services via "make". make sure you don't run docker commands that don't end, like "docker compose logs -f [service]" (specifically the -f is the issue).
+
 ---
 
 ## LocalMart System Architecture
