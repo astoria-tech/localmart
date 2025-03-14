@@ -65,7 +65,7 @@ export default function Header() {
                     rel="noopener noreferrer"
                     className="text-sm text-white/80 hover:text-white transition-colors ml-2"
                   >
-                    database
+                    db
                   </a>
                   <Link
                     href="/orders"
