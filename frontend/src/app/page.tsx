@@ -54,16 +54,12 @@ export default function Page() {
           <div className="animate-pulse space-y-8">
             {/* Hero section skeleton */}
             <div className="h-64 bg-white/50 rounded-lg"></div>
-            {/* Featured stores skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-48 bg-white/50 rounded-lg"></div>
-              ))}
-            </div>
-            {/* Items grid skeleton */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-64 bg-white/50 rounded-lg"></div>
+            {/* Promo banner skeleton */}
+            <div className="h-24 bg-white/50 rounded-lg"></div>
+            {/* Items flow skeleton */}
+            <div className="flex flex-wrap gap-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div key={i} className="h-64 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] md:w-[calc(25%-9px)] lg:w-[calc(20%-10px)] xl:w-[calc(16.666%-10px)] bg-white/50 rounded-lg"></div>
               ))}
             </div>
           </div>
@@ -85,9 +81,23 @@ export default function Page() {
     );
   }
 
+  // Get all items from all stores
+  const allItems = stores.reduce((acc, store) => {
+    if (store.items && store.items.length > 0) {
+      // Take up to 6 items from each store and add store info to each item
+      const storeItems = store.items.slice(0, 6).map(item => ({
+        ...item,
+        storeName: store.name,
+        storeId: store.id
+      }));
+      return [...acc, ...storeItems];
+    }
+    return acc;
+  }, [] as (StoreItem & { storeName: string; storeId: string })[]);
+
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#F5F2EB]">
-      {/* Hero Section - More compact */}
+      {/* Hero Section */}
       <div className="bg-gradient-to-b from-[#2A9D8F]/20 to-transparent pt-24 pb-10 relative overflow-hidden">
         {/* Decorative Background Pattern */}
         <div className="absolute inset-0 opacity-[0.15]" style={{ 
@@ -137,91 +147,96 @@ export default function Page() {
 
       {/* Main Content Container */}
       <div className="container mx-auto px-4 -mt-4">
-        {/* Promotional Banner - Moved above store items */}
-        <div className="bg-gradient-to-r from-[#2A9D8F]/20 to-[#2A9D8F]/5 rounded-xl p-6 mb-8">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="mb-4 md:mb-0">
-              <h3 className="text-xl font-bold text-[#2D3748] mb-2">Free Delivery on Your First Order</h3>
-              <p className="text-[#4A5568]">Use code <span className="font-semibold">FIRSTORDER</span> at checkout</p>
+        {/* Promotional Banner */}
+        <div className="bg-gradient-to-r from-[#2A9D8F]/20 via-[#2A9D8F]/10 to-[#2A9D8F]/5 rounded-xl overflow-hidden shadow-sm relative mb-8">
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#2A9D8F]/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#2A9D8F]/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+          
+          <div className="relative p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 mr-6 hidden md:block">
+                <div className="bg-white/80 backdrop-blur-sm p-3 rounded-full shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#2A9D8F]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+              </div>
+              <div className="max-w-xl">
+                <h3 className="text-xl font-bold text-[#2D3748] mb-2">Free Delivery on Your First Order</h3>
+                <p className="text-[#4A5568]">Use code <span className="inline-block bg-white/70 backdrop-blur-sm px-2 py-0.5 rounded font-semibold text-[#2A9D8F] shadow-sm">FIRSTORDER</span> at checkout</p>
+              </div>
             </div>
-            <button className="bg-[#2A9D8F] hover:bg-[#40B4A6] text-white px-6 py-2 rounded-lg transition-colors shadow-sm">
-              Shop Now
-            </button>
           </div>
         </div>
 
-        {/* Store Sections - Compact Grid Layout */}
-        {stores.map((store, storeIndex) => store.items && store.items.length > 0 && (
-          <div key={store.id} className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <Link
-                href={`/store/${store.id}`}
-                className="group flex items-center"
-              >
-                <h2 className="text-xl font-bold text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors">{store.name}</h2>
-                <span className="ml-2 px-2 py-0.5 bg-[#2A9D8F]/10 rounded text-xs text-[#2A9D8F] font-medium">Local Favorite</span>
-              </Link>
-              <Link
-                href={`/store/${store.id}`}
-                className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm font-medium flex items-center gap-1 group"
-              >
-                See all
-                <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
-              </Link>
-            </div>
-            
-            {/* Compact Product Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {store.items.slice(0, 6).map((item) => (
-                <div
-                  key={item.id}
-                  className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-100 hover:border-[#2A9D8F]/20"
-                >
-                  <Link href={`/store/${store.id}`} className="block">
-                    <div className="aspect-w-1 aspect-h-1 bg-gray-50">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
-                      />
-                    </div>
-                  </Link>
-                  <div className="p-3">
-                    <Link href={`/store/${store.id}`} className="block">
-                      <h3 className="text-sm font-medium text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors line-clamp-2 min-h-[2.5rem]">
-                        {item.name}
-                      </h3>
-                    </Link>
-                    
-                    {/* Rating Stars */}
-                    <div className="flex items-center mt-1 mb-1">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <StarIcon key={i} className={`h-3 w-3 ${i < 4 ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`} />
-                        ))}
-                      </div>
-                      <span className="text-xs text-gray-500 ml-1">({Math.floor(Math.random() * 100) + 10})</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-[#2A9D8F] font-semibold">${item.price.toFixed(2)}</p>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleAddToCart(store.id, item);
-                        }}
-                        className="p-1.5 text-[#2A9D8F] hover:text-white hover:bg-[#2A9D8F] rounded-full transition-colors group/btn"
-                        aria-label={`Add ${item.name} to cart`}
-                      >
-                        <ShoppingCartIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-[#2D3748]">Shop Local Favorites</h2>
+          <Link
+            href="/stores"
+            className="text-[#2A9D8F] hover:text-[#40B4A6] transition-colors text-sm font-medium flex items-center gap-1 group"
+          >
+            View all stores
+            <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
+          </Link>
+        </div>
+
+        {/* Continuous Product Flow Layout */}
+        <div className="flex flex-wrap gap-3 mb-12">
+          {allItems.map((item) => (
+            <div
+              key={`${item.storeId}-${item.id}`}
+              className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-100 hover:border-[#2A9D8F]/20 w-[calc(50%-6px)] sm:w-[calc(33.333%-8px)] md:w-[calc(25%-9px)] lg:w-[calc(20%-10px)] xl:w-[calc(16.666%-10px)]"
+            >
+              <Link href={`/store/${item.storeId}`} className="block">
+                <div className="aspect-w-1 aspect-h-1 bg-gray-50">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
+                  />
                 </div>
-              ))}
+              </Link>
+              <div className="p-3">
+                <Link href={`/store/${item.storeId}`} className="block">
+                  <div className="mb-1">
+                    <span className="text-xs font-medium text-[#2A9D8F] bg-[#2A9D8F]/10 px-2 py-0.5 rounded">
+                      {item.storeName}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-medium text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors line-clamp-2 min-h-[2.5rem]">
+                    {item.name}
+                  </h3>
+                </Link>
+                
+                {/* Rating Stars */}
+                <div className="flex items-center mt-1 mb-1">
+                  <div className="flex items-center">
+                    {[...Array(5)].map((_, i) => (
+                      <StarIcon key={i} className={`h-3 w-3 ${i < 4 ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`} />
+                    ))}
+                  </div>
+                  <span className="text-xs text-gray-500 ml-1">({Math.floor(Math.random() * 100) + 10})</span>
+                </div>
+                
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-[#2A9D8F] font-semibold">${item.price.toFixed(2)}</p>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAddToCart(item.storeId, item);
+                    }}
+                    className="p-1.5 text-[#2A9D8F] hover:text-white hover:bg-[#2A9D8F] rounded-full transition-colors group/btn"
+                    aria-label={`Add ${item.name} to cart`}
+                  >
+                    <ShoppingCartIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </main>
   );
