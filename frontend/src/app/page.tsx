@@ -119,8 +119,8 @@ export default function Page() {
                   Neighborhood
                 </label>
                 <div className="relative ml-2">
-                  <InformationCircleIcon
-                    className="h-5 w-5 text-[#2A9D8F] cursor-help"
+                  <InformationCircleIcon 
+                    className="h-5 w-5 text-[#2A9D8F] cursor-help" 
                     onMouseEnter={() => setShowTooltip(true)}
                     onMouseLeave={() => setShowTooltip(false)}
                   />

@@ -55,6 +55,12 @@ export default function Header() {
             <BuildingStorefrontIcon className="h-7 w-7 text-white/90 group-hover:text-white transition-colors" />
             <span className="text-2xl font-bold font-display text-white">localmart</span>
           </Link>
+          <Link
+            href="/about"
+            className="text-sm text-white/80 hover:text-white transition-colors ml-4"
+          >
+            About Us
+          </Link>
           {user && (
             <>
               {isAdmin && (
