@@ -5,7 +5,7 @@ import { useCart } from '@/app/contexts/cart';
 import { toast } from 'react-hot-toast';
 import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { SiBluesky } from 'react-icons/si';
-import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, MapPinIcon, ChartBarIcon, ShoppingBagIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { config } from '@/config';
 import { useStoreRoles } from '@/app/hooks/useStoreRoles';
 import Link from 'next/link';
@@ -188,31 +188,38 @@ export default function StoreContent({ storeId }: { storeId: string }) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="bg-white/80 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-4 hover:bg-white overflow-hidden"
+              className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-100 hover:border-[#2A9D8F]/20"
             >
-              <div className="aspect-w-4 aspect-h-3 mb-3 rounded-md overflow-hidden">
+              <div className="aspect-w-1 aspect-h-1 bg-gray-50">
                 <img
                   src={item.imageUrl}
                   alt={item.name}
-                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-200"
                 />
               </div>
-              <h3 className="text-base font-semibold text-[#2D3748] mb-1">{item.name}</h3>
-              <p className="text-[#4A5568] mb-3">${item.price.toFixed(2)}</p>
-              <button
-                onClick={() => {
-                  addItem({
-                    ...item,
-                    store: storeId
-                  });
-                  if (!hasItemsFromDifferentStore) {
-                    toast.success('Added to cart');
-                  }
-                }}
-                className="w-full bg-[#2A9D8F] text-white py-2 px-4 rounded-md hover:bg-[#40B4A6] active:bg-[#1E7268] transition-colors duration-200"
-              >
-                Add to Cart
-              </button>
+              <div className="p-3">
+                <h3 className="text-sm font-medium text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors line-clamp-2 min-h-[2.5rem] mb-2">
+                  {item.name}
+                </h3>
+                <div className="flex items-center justify-between">
+                  <p className="text-[#2A9D8F] font-semibold">${item.price.toFixed(2)}</p>
+                  <button
+                    onClick={() => {
+                      addItem({
+                        ...item,
+                        store: storeId
+                      });
+                      if (!hasItemsFromDifferentStore) {
+                        toast.success('Added to cart');
+                      }
+                    }}
+                    className="p-1.5 text-[#2A9D8F] hover:text-white hover:bg-[#2A9D8F] rounded-full transition-colors group/btn"
+                    aria-label={`Add ${item.name} to cart`}
+                  >
+                    <ShoppingCartIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>

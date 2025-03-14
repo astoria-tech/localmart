@@ -245,16 +245,6 @@ export default function Page() {
                   </h3>
                 </Link>
                 
-                {/* Rating Stars */}
-                <div className="flex items-center mt-1 mb-1">
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <StarIcon key={i} className={`h-3 w-3 ${i < 4 ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`} />
-                    ))}
-                  </div>
-                  <span className="text-xs text-gray-500 ml-1">({Math.floor(Math.random() * 100) + 10})</span>
-                </div>
-                
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-[#2A9D8F] font-semibold">${item.price.toFixed(2)}</p>
                   <button
