@@ -88,7 +88,6 @@ export default function StoreContent({ storeId }: { storeId: string }) {
               {/* Store Name and Type */}
               <div className="relative">
                 <h1 className="text-3xl md:text-4xl font-bold text-[#2D3748] mb-2 transition-colors">{store.name}</h1>
-                <p className="text-[#4A5568] text-sm md:text-base">Local market & grocery</p>
                 
                 {/* Vendor Links */}
                 {isAdmin && (

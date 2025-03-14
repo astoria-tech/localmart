@@ -16,6 +16,8 @@ there is already a terminal running all of the services via "make". make sure yo
 
 also remember that the frontend and backend autoreload, so you should check the logs first before restarting the services.
 
+if you update npm or poetry dependencies, you should first build the containers via compose build, and then restart the services via compose restart.
+
 ---
 
 ## LocalMart System Architecture

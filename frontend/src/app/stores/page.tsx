@@ -102,7 +102,7 @@ export default function StoresPage() {
                         <h2 className="text-xl font-bold text-[#2D3748] group-hover:text-[#2A9D8F] transition-colors">{store.name}</h2>
                         <span className="px-2 py-0.5 bg-[#2A9D8F]/10 rounded text-xs text-[#2A9D8F] font-medium">Local Favorite</span>
                       </div>
-                      <p className="text-[#4A5568] text-sm mt-1">Local market & grocery</p>
+                      <p className="text-[#4A5568] text-sm mt-1">Local market</p>
                       
                       <div className="flex flex-wrap gap-6 mt-4">
                         {/* Hours */}
