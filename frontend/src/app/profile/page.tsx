@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/auth';
 import { toast } from 'react-hot-toast';
-import { config } from '@/config';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import { authApi, paymentApi, Profile, SavedCard } from '@/api';
 
 // Initialize Stripe
+console.log('process.env.NEXT_PUBLIC_STRIPE_KEY', process.env.NEXT_PUBLIC_STRIPE_KEY);
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_KEY!);
 
 // Card form component

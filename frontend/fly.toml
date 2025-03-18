@@ -8,14 +8,11 @@ primary_region = "ewr" # Change this to your preferred region
     NEXT_PUBLIC_POCKETBASE_URL = "https://localmart-pocketbase.fly.dev"
     NEXT_PUBLIC_SEARCH_URL = "https://localmart-search.fly.dev"
     NEXT_PUBLIC_MEILI_URL = "https://localmart-meilisearch.fly.dev"
+    NEXT_PUBLIC_STRIPE_KEY = "${NEXT_PUBLIC_STRIPE_KEY}"
 
 [env]
   NODE_ENV = "production"
   PORT = "3000"
-  NEXT_PUBLIC_API_URL = "https://localmart-backend.fly.dev"
-  NEXT_PUBLIC_POCKETBASE_URL = "https://localmart-pocketbase.fly.dev"
-  NEXT_PUBLIC_SEARCH_URL = "https://localmart-search.fly.dev"
-  NEXT_PUBLIC_MEILI_URL = "https://localmart-meilisearch.fly.dev"
 
 [http_service]
   internal_port = 3000
@@ -29,4 +26,4 @@ primary_region = "ewr" # Change this to your preferred region
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 2048
+  memory_mb = 1024
