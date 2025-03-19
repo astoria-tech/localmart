@@ -4,11 +4,11 @@ primary_region = "ewr" # Change this to your preferred region
 [build]
   dockerfile = "Dockerfile.prod"
   [build.args]
+    NODE_ENV = "production"
     NEXT_PUBLIC_API_URL = "https://localmart-backend.fly.dev"
+    NEXT_PUBLIC_MEILI_URL = "https://localmart-meilisearch.fly.dev"
     NEXT_PUBLIC_POCKETBASE_URL = "https://localmart-pocketbase.fly.dev"
     NEXT_PUBLIC_SEARCH_URL = "https://localmart-search.fly.dev"
-    NEXT_PUBLIC_MEILI_URL = "https://localmart-meilisearch.fly.dev"
-    NEXT_PUBLIC_STRIPE_KEY = "${NEXT_PUBLIC_STRIPE_KEY}"
 
 [env]
   NODE_ENV = "production"

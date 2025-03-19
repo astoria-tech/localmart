@@ -1,18 +1,7 @@
+# Builder stage
 FROM node:18-alpine AS builder
 
-# Define build arguments
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_POCKETBASE_URL
-ARG NEXT_PUBLIC_SEARCH_URL
-ARG NEXT_PUBLIC_MEILI_URL
-
 WORKDIR /app
-
-# Set environment variables for build time
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
-ENV NEXT_PUBLIC_SEARCH_URL=${NEXT_PUBLIC_SEARCH_URL}
-ENV NEXT_PUBLIC_MEILI_URL=${NEXT_PUBLIC_MEILI_URL}
 
 # Install dependencies
 COPY package.json package-lock.json ./
@@ -21,25 +10,29 @@ RUN npm ci
 # Copy application code
 COPY . .
 
-# Build the application
-RUN npm run build
-
-# Production image
-FROM node:18-alpine AS runner
-WORKDIR /app
-
-ENV NODE_ENV production
-
-# Pass build arguments to runtime environment variables
+# Define build arguments
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_POCKETBASE_URL
 ARG NEXT_PUBLIC_SEARCH_URL
 ARG NEXT_PUBLIC_MEILI_URL
+ARG NEXT_PUBLIC_STRIPE_KEY
 
+# Set environment variables for build time
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
 ENV NEXT_PUBLIC_SEARCH_URL=${NEXT_PUBLIC_SEARCH_URL}
 ENV NEXT_PUBLIC_MEILI_URL=${NEXT_PUBLIC_MEILI_URL}
+ENV NEXT_PUBLIC_STRIPE_KEY=${NEXT_PUBLIC_STRIPE_KEY}
+
+# Build the application
+RUN npm run build
+
+
+# Runner stage
+FROM node:18-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
 
 # Add non-root user for security
 RUN addgroup --system --gid 1001 nodejs

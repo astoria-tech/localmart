@@ -13,7 +13,7 @@ clean-data:
 	rm -rf frontend/.next
 
 deploy-frontend:
-	cd frontend && fly deploy
+	cd frontend && fly deploy --build-arg NEXT_PUBLIC_STRIPE_KEY=$(NEXT_PUBLIC_STRIPE_KEY)
 
 deploy-backend:
 	cd python-backend && fly deploy
@@ -28,7 +28,7 @@ deploy-search:
 	cd search && fly deploy
 
 deploy-frontend-prod:
-	cd frontend && fly deploy --config fly.prod.toml
+	cd frontend && fly deploy --config fly.prod.toml --build-arg NEXT_PUBLIC_STRIPE_KEY=$(NEXT_PUBLIC_STRIPE_KEY)
 
 deploy-backend-prod:
 	cd python-backend && fly deploy --config fly.prod.toml
